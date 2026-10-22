@@ -172,3 +172,17 @@ persistência local e exportação substitui a perda de marcações no recarrega
 - O limite de 100 MB foi conferido por inspeção de código; não foi medido como
   limite de desempenho em aparelho real.
 - A versão web ainda precisa ser experimentada nos aparelhos físicos do usuário.
+
+## Correção do aviso no iPhone (22/10/2026)
+
+- Sintoma: no Safari do iPhone, o PDF de 111 páginas aparecia, mas surgia
+  "Não foi possível exibir esta página".
+- Causas tratadas: as opções antigas de fontes e CMaps eram ignoradas pelo
+  PDF.js 6 (agora `BinaryDataFactory` local); o limite de memória de canvas do
+  Safari (nova tentativa em resolução menor, teto de 5 MP); redesenho a cada
+  mudança de altura da barra do Safari (agora só quando a largura muda); texto
+  acessível e notas do PDF deixaram de bloquear a página quando falham.
+- Testes: perfil iPhone com toque, limite de canvas simulado, variação de
+  altura, navegação, zoom de 180% e download da cópia anotada (qpdf sem erro).
+  Site público republicado (service worker 79a49835c118), sem erros.
+- Limite: WebKit real indisponível neste ambiente; confirmar no iPhone.
