@@ -4,6 +4,16 @@ PWA estática em português para leitura local e offline, com grifos, caneta,
 notas, retomada da última leitura e exportação de uma cópia PDF anotada.
 Sem Vercel, backend, cadastro, senha do app ou servidor de documentos.
 
+## Endereço publicado
+
+[Abrir Multiversão | Leitor PDF](https://multiversao-leitor-pdf.pplx.app)
+
+Visibilidade pública. A instalação e o modo offline devem ser usados nesse
+endereço próprio, não na prévia em iframe. O primeiro preparo exige internet;
+depois o app pode retomar a última leitura local e gerar cópias sem conexão.
+O site publicado contém somente o leitor, a marca, os contatos autorizados e
+um exemplo genérico, sem PDFs pessoais ou materiais dos alunos.
+
 ## Funcionalidades
 
 - Abrir PDF do próprio dispositivo, com PDF.js 5.6.205.

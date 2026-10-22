@@ -48,7 +48,8 @@ bloqueio de comandos durante troca de documento; recortes proporcionais da marca
 Limites: Samsung/S Pen, iPad/Safari e Apple Pencil físicos ainda não testados.
 O app não remove senhas de abertura, DRM ou permissões. O navegador pode apagar
 dados locais. A prévia não é um endereço de instalação e bloqueia download e
-persistência; publicação HTTPS própria permanece pendente de autorização.
+persistência. A publicação HTTPS própria foi posteriormente autorizada e
+concluída, conforme o registro de publicação definitiva abaixo.
 
 Prévia hospedada atualizada no mesmo artefato e validada em contexto novo:
 título e logotipo corretos, exemplo de três páginas, grifo e geração da cópia,
@@ -57,7 +58,40 @@ Também foi validado iframe opaco com sandbox: ECA protegido de 162 páginas,
 grifo e geração da cópia passaram sem erros; botão de download permaneceu
 corretamente bloqueado. Telas hospedadas de 1440×1000 e 375×812 inspecionadas,
 sem transbordamento; contatos e botão Entendi acessíveis no diálogo rolável.
-Sessões de teste encerradas. Publicação pública não executada.
+Sessões de teste da prévia encerradas.
+
+## Publicação definitiva em 22/10/2026
+
+- Endereço: https://multiversao-leitor-pdf.pplx.app
+- Visibilidade: Public, confirmada pelo serviço de publicação e por acesso em
+  navegador novo, sem conta. Nenhum projeto Vercel foi criado.
+- Site ID: `06ed0a42-b238-461d-aac9-c1ad88ac4d54`.
+- Artefato: `3ee79ac2-2859-4efd-8dea-bf56cef5d115`.
+- Revisão de segurança: PASS, sem BLOCK. Os dois WARN (retenção local possível
+  entre abas e endurecimento adicional de CSP) foram apresentados e aceitos
+  explicitamente pelo usuário antes de publicar a versão atual.
+- HTTPS e página inicial: HTTP 200, marca e título corretos, sem aviso de prévia.
+- Manifesto: `application/manifest+json`; service worker: `text/javascript`.
+- Chrome em perfil normal: `installabilityErrors: []`.
+- Cabeçalhos reais: `X-Content-Type-Options: nosniff` e CSP
+  `frame-ancestors 'none'; base-uri 'self'; object-src 'none'`.
+  Não foi adicionada uma diretiva script-src pelo app.
+- Recursos offline preparados. Com rede desligada: recarregar, retomar o ECA
+  de 162 páginas na página 3, recuperar grifo/caneta/nota e baixar a cópia
+  anotada passaram no endereço público. Sem erros de execução.
+- Cópia efetivamente baixada do site público: qpdf sem erro, prefixo integral
+  original, criptografia e texto/marca-d'água da capa preservados; anotações
+  nativas e conteúdo da nota presentes; 162 páginas renderizadas por PDFium.
+- Reabertura dessa cópia no site: comentário nativo acessível e correto.
+- Rota pessoal `/__local__/active.json`: 404 esperado, sem servir dados locais.
+- Suporte WhatsApp: link público ativado e telefone de destino confirmado.
+- Tela pública 375×812 com toque emulado: grifo, controles e layout passaram,
+  sem transbordamento horizontal nem erro de execução.
+- Limite mantido: Samsung/S Pen e iPad/Safari/Apple Pencil físicos não testados.
+  O navegador pode remover armazenamento local; manter backup em PDF.
+
+Controles de visibilidade publicados:
+https://www.perplexity.ai/computer/a/3ee79ac2-2859-4efd-8dea-bf56cef5d115?open-publish=true
 
 ## Escopo
 
