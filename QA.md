@@ -201,3 +201,13 @@ persistência local e exportação substitui a perda de marcações no recarrega
   altura mínima de uma linha. Um grifo de várias linhas desfaz em um passo.
 - Testes: toques CDP em perfil iPhone no ECA (duas colunas), caneta, nota,
   exportação (qpdf sem erro, render poppler) e reabertura da cópia com nota.
+
+## Tela de leitura limpa (22/10/2026)
+
+- Barra superior única e fina (marca, nome do arquivo, Salvar, ajuda, abrir);
+  ferramentas na barra inferior; cores/traço em pílula flutuante só ao grifar
+  ou escrever; páginas e zoom em pílula escura flutuante no modo Ler; fundo
+  cinza neutro com a página em destaque; dicas como aviso breve.
+- Toque na página (modo Ler) alterna tela cheia, sem barras.
+- Testado em 390×844 com toque e 1366×860: sem transbordamento, grifo por
+  passada, nota, desfazer/refazer, exportação e ajuda funcionando, sem erros.

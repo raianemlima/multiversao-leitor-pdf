@@ -110,6 +110,17 @@ class LocalBinaryDataFactory {
   }
 }
 
+let hintTimer;
+function flashHint() {
+  document.body.classList.add('show-hint');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => document.body.classList.remove('show-hint'), 2400);
+}
+
+function setImmersive(on) {
+  document.body.classList.toggle('immersive', Boolean(on && state.document));
+}
+
 function setMode(mode) {
   state.mode = mode;
   state.draft = null;
@@ -121,7 +132,11 @@ function setMode(mode) {
     button.classList.toggle('selected', selected);
     button.setAttribute('aria-pressed', String(selected));
   });
+  const changed = document.body.dataset.tool !== mode;
+  document.body.dataset.tool = mode;
   $('mode-hint').querySelector('span').textContent = hints[mode];
+  if (mode !== 'read') setImmersive(false);
+  if (changed && state.document) flashHint();
   redrawAnnotations();
 }
 
@@ -140,9 +155,10 @@ function updateControls() {
   $('toolbar').hidden = !loaded;
   $('reader-controls').hidden = !loaded;
   document.body.classList.toggle('has-document', loaded);
+  if (!loaded) setImmersive(false);
   $('export-button').hidden = !loaded;
   $('export-button').disabled = busy;
-  $('export-button').querySelector('span').textContent = state.exporting ? 'Gerando…' : 'Salvar PDF';
+  $('export-button').querySelector('span').innerHTML = state.exporting ? 'Gerando…' : 'Salvar<span class="export-label-long"> PDF</span>';
   $('page-number').value = state.page;
   $('page-number').max = state.document?.numPages ?? 1;
   $('page-total').textContent = state.document?.numPages ?? 0;
@@ -309,7 +325,7 @@ async function renderPage() {
     if (epoch !== renderEpoch || state.document !== doc) return;
     const base = page.getViewport({ scale: 1 });
     const mobile = window.innerWidth <= 720;
-    const available = Math.max(240, workspace.clientWidth - (mobile ? 24 : 64));
+    const available = Math.max(240, workspace.clientWidth - (mobile ? 16 : 64));
     const targetWidth = Math.min(920, available) * state.zoom;
     const viewport = page.getViewport({ scale: targetWidth / base.width });
     pageRatio = viewport.height / viewport.width;
@@ -718,6 +734,22 @@ layer.addEventListener('pointerdown', event => {
   state.draft = state.mode === 'highlight'
     ? { id: nextId(), type: 'highlight', ...point, w: 0, h: 0, color: state.color, parts: null }
     : { id: nextId(), type: 'pen', points: [point], color: state.color, width: state.penWidth * 1.7 };
+});
+
+// Modo Ler: um toque na página esconde/mostra as barras (tela cheia).
+let tapStart = null;
+workspace.addEventListener('pointerdown', event => {
+  tapStart = state.mode === 'read' && event.isPrimary ? { x: event.clientX, y: event.clientY, t: Date.now() } : null;
+});
+workspace.addEventListener('click', event => {
+  if (!state.document || state.mode !== 'read' || !tapStart) return;
+  const moved = Math.hypot(event.clientX - tapStart.x, event.clientY - tapStart.y);
+  const quick = Date.now() - tapStart.t < 450;
+  tapStart = null;
+  if (moved > 10 || !quick) return;
+  if (event.target.closest('[data-annotation-id], .note-marker, .note-bubble, button, a, input, select, textarea')) return;
+  if (!$('note-bubble').hidden) return;
+  setImmersive(!document.body.classList.contains('immersive'));
 });
 
 let redrawFrame = 0;

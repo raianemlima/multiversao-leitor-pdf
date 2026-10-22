@@ -17,10 +17,23 @@
   <script src="./vendor/lucide.min.js" defer></script>
   <script type="module" src="./app.js"></script>
 </head>
-<body>
+<body data-tool="read">
   <a class="skip-link" href="#workspace">Ir para a leitura</a>
   <header class="app-header">
-    <div class="wordmark" aria-label="Multiversão, Leitor PDF"><img src="./brand/wordmark.webp" alt="Multiversão" width="174" height="32"><span class="wordmark-detail">LEITOR PDF</span></div>
+    <div class="wordmark" aria-label="Multiversão, Leitor PDF"><img class="brand-mark" src="./brand/icon-192.png" alt="" width="30" height="30" aria-hidden="true"><img class="brand-wordmark" src="./brand/wordmark.webp" alt="Multiversão" width="174" height="32"><span class="wordmark-detail">LEITOR PDF</span></div>
+    <section class="document-bar" aria-label="Documento atual">
+      <div class="document-info">
+        <i data-lucide="file-text" aria-hidden="true"></i>
+        <div class="document-labels">
+          <h1 id="file-name" data-testid="text-file-name">Seu espaço de leitura</h1>
+          <p id="file-details" data-testid="text-file-details">Sem cadastro. Sem alterar o original.</p>
+        </div>
+      </div>
+      <div class="document-actions">
+        <button id="pwa-button" class="offline-button" title="Instalação e uso offline" data-testid="button-pwa"><span class="status-dot"></span><span id="pwa-label" data-testid="text-pwa-status">Preparando app…</span><i data-lucide="download"></i></button>
+        <button id="export-button" class="primary-button compact" hidden data-testid="button-export"><i data-lucide="file-down"></i><span>Salvar<span class="export-label-long"> PDF</span></span></button>
+      </div>
+    </section>
     <span class="privacy"><i data-lucide="shield-check" aria-hidden="true"></i> O arquivo fica no seu aparelho</span>
     <div class="header-actions">
       <button id="help-button" class="icon-button" aria-label="Como usar" title="Como usar" data-testid="button-help"><i data-lucide="circle-help"></i></button>
@@ -29,45 +42,9 @@
     <input id="file-input" type="file" accept=".pdf,application/pdf" class="sr-only" aria-label="Escolher arquivo PDF" data-testid="input-file">
   </header>
 
-  <section class="document-bar" aria-label="Documento atual">
-    <div class="document-info">
-      <i data-lucide="file-text" aria-hidden="true"></i>
-      <div class="document-labels">
-        <h1 id="file-name" data-testid="text-file-name">Seu espaço de leitura</h1>
-        <p id="file-details" data-testid="text-file-details">Sem cadastro. Sem alterar o original.</p>
-      </div>
-    </div>
-    <div class="document-actions">
-      <button id="pwa-button" class="offline-button" title="Instalação e uso offline" data-testid="button-pwa"><span class="status-dot"></span><span id="pwa-label" data-testid="text-pwa-status">Preparando app…</span><i data-lucide="download"></i></button>
-      <button id="export-button" class="primary-button compact" hidden data-testid="button-export"><i data-lucide="file-down"></i><span>Salvar PDF</span></button>
-    </div>
-  </section>
 
   <div id="preview-notice" class="preview-notice" hidden data-testid="status-preview">Prévia de demonstração. Instalação, arquivos locais e uso offline precisam do endereço próprio do app.</div>
 
-  <nav id="toolbar" class="toolbar" aria-label="Ferramentas de leitura" hidden>
-    <div class="tool-group modes" role="group" aria-label="Modo de interação">
-      <button class="tool-button selected" data-mode="read" aria-pressed="true" title="Ler e rolar" data-testid="button-mode-read"><i data-lucide="hand"></i><span>Ler</span></button>
-      <button class="tool-button" data-mode="highlight" aria-pressed="false" title="Grifar: arraste sobre o trecho" data-testid="button-mode-highlight"><i data-lucide="highlighter"></i><span>Grifar</span></button>
-      <button class="tool-button" data-mode="pen" aria-pressed="false" title="Escrever à mão" data-testid="button-mode-pen"><i data-lucide="pen-line"></i><span>Caneta</span></button>
-      <button class="tool-button" data-mode="note" aria-pressed="false" title="Adicionar nota na página" data-testid="button-mode-note"><i data-lucide="sticky-note"></i><span>Nota</span></button>
-      <button class="tool-button" data-mode="eraser" aria-pressed="false" title="Toque em uma marcação para apagar" data-testid="button-mode-eraser"><i data-lucide="eraser"></i><span>Borracha</span></button>
-    </div>
-    <div class="tool-group ink-options" role="group" aria-label="Cores e espessura">
-      <div id="colors" class="color-options">
-        <button class="color-button selected" data-color="yellow" aria-label="Amarelo" aria-pressed="true" title="Amarelo" data-testid="button-color-yellow"><span style="--swatch:#f2cf49"></span></button>
-        <button class="color-button" data-color="green" aria-label="Verde" aria-pressed="false" title="Verde" data-testid="button-color-green"><span style="--swatch:#78c39f"></span></button>
-        <button class="color-button" data-color="pink" aria-label="Rosa" aria-pressed="false" title="Rosa" data-testid="button-color-pink"><span style="--swatch:#ef9ba8"></span></button>
-        <button class="color-button" data-color="blue" aria-label="Azul" aria-pressed="false" title="Azul" data-testid="button-color-blue"><span style="--swatch:#91b9ea"></span></button>
-      </div>
-      <label class="width-control" for="pen-width"><span>Traço</span><select id="pen-width" aria-label="Espessura da caneta" data-testid="select-pen-width"><option value="1.5">Fino</option><option value="2.5" selected>Médio</option><option value="4.5">Grosso</option></select></label>
-    </div>
-    <div class="tool-group history-tools" role="group" aria-label="Histórico de marcações">
-      <button id="undo-button" class="icon-button" aria-label="Desfazer nesta página" title="Desfazer" disabled data-testid="button-undo"><i data-lucide="undo-2"></i></button>
-      <button id="redo-button" class="icon-button" aria-label="Refazer nesta página" title="Refazer" disabled data-testid="button-redo"><i data-lucide="redo-2"></i></button>
-      <button id="clear-button" class="icon-button" aria-label="Apagar marcações desta página" title="Apagar marcações desta página" disabled data-testid="button-clear"><i data-lucide="trash-2"></i></button>
-    </div>
-  </nav>
 
   <div id="error-banner" class="error-banner" role="alert" hidden data-testid="status-error"><i data-lucide="circle-alert"></i><span id="error-message"></span><button id="dismiss-error" class="icon-button" aria-label="Fechar aviso" data-testid="button-dismiss-error"><i data-lucide="x"></i></button></div>
 
@@ -93,6 +70,29 @@
     </section>
     <div id="document-loading" class="document-loading" hidden role="status" data-testid="status-loading"><i data-lucide="file-text"></i><p>Abrindo seu PDF no aparelho…</p></div>
   </main>
+  <nav id="toolbar" class="toolbar" aria-label="Ferramentas de leitura" hidden>
+    <div class="tool-group modes" role="group" aria-label="Modo de interação">
+      <button class="tool-button selected" data-mode="read" aria-pressed="true" title="Ler e rolar" data-testid="button-mode-read"><i data-lucide="hand"></i><span>Ler</span></button>
+      <button class="tool-button" data-mode="highlight" aria-pressed="false" title="Grifar: arraste sobre o trecho" data-testid="button-mode-highlight"><i data-lucide="highlighter"></i><span>Grifar</span></button>
+      <button class="tool-button" data-mode="pen" aria-pressed="false" title="Escrever à mão" data-testid="button-mode-pen"><i data-lucide="pen-line"></i><span>Caneta</span></button>
+      <button class="tool-button" data-mode="note" aria-pressed="false" title="Adicionar nota na página" data-testid="button-mode-note"><i data-lucide="sticky-note"></i><span>Nota</span></button>
+      <button class="tool-button" data-mode="eraser" aria-pressed="false" title="Toque em uma marcação para apagar" data-testid="button-mode-eraser"><i data-lucide="eraser"></i><span>Borracha</span></button>
+    </div>
+    <div class="tool-group ink-options" role="group" aria-label="Cores e espessura">
+      <div id="colors" class="color-options">
+        <button class="color-button selected" data-color="yellow" aria-label="Amarelo" aria-pressed="true" title="Amarelo" data-testid="button-color-yellow"><span style="--swatch:#f2cf49"></span></button>
+        <button class="color-button" data-color="green" aria-label="Verde" aria-pressed="false" title="Verde" data-testid="button-color-green"><span style="--swatch:#78c39f"></span></button>
+        <button class="color-button" data-color="pink" aria-label="Rosa" aria-pressed="false" title="Rosa" data-testid="button-color-pink"><span style="--swatch:#ef9ba8"></span></button>
+        <button class="color-button" data-color="blue" aria-label="Azul" aria-pressed="false" title="Azul" data-testid="button-color-blue"><span style="--swatch:#91b9ea"></span></button>
+      </div>
+      <label class="width-control" for="pen-width"><span>Traço</span><select id="pen-width" aria-label="Espessura da caneta" data-testid="select-pen-width"><option value="1.5">Fino</option><option value="2.5" selected>Médio</option><option value="4.5">Grosso</option></select></label>
+    </div>
+    <div class="tool-group history-tools" role="group" aria-label="Histórico de marcações">
+      <button id="undo-button" class="icon-button" aria-label="Desfazer nesta página" title="Desfazer" disabled data-testid="button-undo"><i data-lucide="undo-2"></i></button>
+      <button id="redo-button" class="icon-button" aria-label="Refazer nesta página" title="Refazer" disabled data-testid="button-redo"><i data-lucide="redo-2"></i></button>
+      <button id="clear-button" class="icon-button" aria-label="Apagar marcações desta página" title="Apagar marcações desta página" disabled data-testid="button-clear"><i data-lucide="trash-2"></i></button>
+    </div>
+  </nav>
 
   <footer class="reader-footer">
     <div id="mode-hint" class="mode-hint" role="status" aria-live="polite" data-testid="text-mode-hint"><i data-lucide="info"></i><span>Multiversão. Sem conta e sem envio dos PDFs.</span></div>
@@ -116,8 +116,8 @@
     <span class="eyebrow">LEITURA SEM COMPLICAÇÃO</span><h2>O original fica intacto.</h2>
     <p>Abra um PDF do seu aparelho. As ferramentas criam marcações separadas do original. Use Salvar PDF para gerar uma cópia com suas anotações, quando o arquivo permitir anotação.</p>
     <ul class="help-list">
-      <li><i data-lucide="hand"></i><div><strong>Ler</strong><span>Use o dedo para rolar. Navegue e ajuste o zoom na barra inferior.</span></div></li>
-      <li><i data-lucide="highlighter"></i><div><strong>Grifar</strong><span>Escolha uma cor e arraste um retângulo sobre o trecho desejado.</span></div></li>
+      <li><i data-lucide="hand"></i><div><strong>Ler</strong><span>Use o dedo para rolar. Toque na página para ler em tela cheia; toque de novo para ver as barras.</span></div></li>
+      <li><i data-lucide="highlighter"></i><div><strong>Grifar</strong><span>Escolha uma cor e passe o dedo sobre o texto. O grifo se ajusta às linhas.</span></div></li>
       <li><i data-lucide="pen-line"></i><div><strong>Caneta</strong><span>Escreva com o dedo, mouse ou caneta compatível com o navegador.</span></div></li>
       <li><i data-lucide="sticky-note"></i><div><strong>Nota</strong><span>Toque na página para adicionar uma nota. No modo Ler, toque no marcador para reler.</span></div></li>
       <li><i data-lucide="eraser"></i><div><strong>Borracha</strong><span>Toque na marcação para removê-la. Use desfazer se precisar.</span></div></li>

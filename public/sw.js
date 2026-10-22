@@ -1,5 +1,5 @@
 /* Recursos do aplicativo somente. PDFs pessoais ficam em cache local separado. */
-const SHELL = 'multiversao-shell-d684adb3273c';
+const SHELL = 'multiversao-shell-975363d0766e';
 const ASSETS = ["./app.js","./brand/icon-192.png","./brand/icon-512.png","./brand/icon-maskable.png","./brand/logo.webp","./brand/wordmark.webp","./demo-data.js","./export-pdf.js","./fonts/lora-LICENSE.txt","./fonts/lora-latin-400-normal.woff2","./fonts/source-sans-3-LICENSE.txt","./fonts/source-sans-3-latin-400-normal.woff2","./fonts/source-sans-3-latin-600-normal.woff2","./index.html","./manifest.webmanifest","./pwa.js","./schema.js","./style.css","./vendor/LUCIDE-LICENSE.txt","./vendor/PDFJS-LICENSE.txt","./vendor/lucide.min.js","./vendor/pdf-resources.js","./vendor/pdf.min.mjs","./vendor/pdf.worker.min.mjs"];
 const ROOT = new URL('./', self.location.href);
 
