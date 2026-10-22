@@ -21,6 +21,7 @@ let noteDraft = null;
 let activeNoteId = null;
 let confirmationAction = null;
 let resizeTimer;
+const MAX_CANVAS_PIXELS = 5_000_000;
 let persistQueue = Promise.resolve();
 let persistRequested = 0;
 let exportFile = null;
@@ -57,13 +58,15 @@ document.querySelectorAll('img').forEach(img => img.addEventListener('error', ()
   img.after(fallback);
 }));
 
-function showError(message) {
+function showError(message, kind = 'general') {
+  $('error-banner').dataset.kind = kind;
   $('error-message').textContent = message;
   $('error-banner').hidden = false;
 }
 
 function clearError() {
   $('error-banner').hidden = true;
+  delete $('error-banner').dataset.kind;
 }
 
 function showConfirmation(title, message, label, action) {
@@ -97,12 +100,13 @@ async function resource(name) {
   return toBytes(map[name]);
 }
 
-class LocalStandardFontDataFactory {
-  async fetch({ filename }) { return resource(filename); }
-}
-
-class LocalCMapReaderFactory {
-  async fetch({ name }) { return { cMapData: await resource(`${name}.bcmap`), compressionType: 1 }; }
+// PDF.js 6 usa uma única fábrica binária para fontes-padrão e CMaps.
+class LocalBinaryDataFactory {
+  constructor() {}
+  async fetch({ kind, filename }) {
+    if (kind !== 'standardFontDataUrl' && kind !== 'cMapUrl') throw new Error(`Recurso não incluído: ${kind}`);
+    return resource(filename);
+  }
 }
 
 function setMode(mode) {
@@ -306,9 +310,7 @@ async function renderPage() {
     const targetWidth = Math.min(920, available) * state.zoom;
     const viewport = page.getViewport({ scale: targetWidth / base.width });
     pageRatio = viewport.height / viewport.width;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(8_000_000 / (viewport.width * viewport.height)));
-    canvas.width = Math.floor(viewport.width * ratio);
-    canvas.height = Math.floor(viewport.height * ratio);
+    const idealRatio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(MAX_CANVAS_PIXELS / (viewport.width * viewport.height)));
     stage.style.width = `${viewport.width}px`;
     stage.style.height = `${viewport.height}px`;
     canvas.style.width = `${viewport.width}px`;
@@ -316,36 +318,66 @@ async function renderPage() {
     canvas.setAttribute('aria-label', `Página ${state.page} de ${doc.numPages}`);
     layer.setAttribute('aria-label', `Marcações da página ${state.page}`);
     redrawAnnotations();
-    const localTask = page.render({
-      canvasContext: canvas.getContext('2d'),
-      viewport,
-      transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
-      background: '#ffffff'
-    });
-    renderTask = localTask;
-    await localTask.promise;
-    if (epoch !== renderEpoch || state.document !== doc) return;
-    renderTask = null;
-    const text = await page.getTextContent();
-    if (epoch === renderEpoch) $('accessible-page-text').textContent = `Página ${state.page}. ${text.items.map(item => item.str ?? '').join(' ')}`;
-    const annotations = await page.getAnnotations();
-    if (epoch === renderEpoch) {
-      for (const annotation of annotations) {
-        if (annotation.subtype !== 'FreeText' || annotation.titleObj?.str !== 'Multiversão' || !annotation.popupRef || !annotation.contentsObj?.str) continue;
-        const a = viewport.convertToViewportPoint(annotation.rect[0], annotation.rect[1]);
-        const b = viewport.convertToViewportPoint(annotation.rect[2], annotation.rect[3]);
-        const rect = [...a, ...b];
-        const id = `native-${annotation.id}`;
-        nativeNotes.set(id, { id, x: Math.min(rect[0], rect[2]) / viewport.width, y: Math.min(rect[1], rect[3]) / viewport.height, text: annotation.contentsObj.str, readOnly: true });
+    // Safari/iPad limita a memória de canvas: se falhar, tenta de novo com menos pixels.
+    let lastError;
+    let drawn = false;
+    for (const ratio of [...new Set([idealRatio, Math.min(idealRatio, 1), Math.min(idealRatio, .75)])]) {
+      if (epoch !== renderEpoch || state.document !== doc) return;
+      try {
+        canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
+        canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
+        const context = canvas.getContext('2d');
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        const localTask = page.render({
+          canvasContext: context,
+          viewport,
+          transform: ratio !== 1 ? [ratio, 0, 0, ratio, 0, 0] : undefined,
+          background: '#ffffff'
+        });
+        renderTask = localTask;
+        await localTask.promise;
+        if (renderTask === localTask) renderTask = null;
+        drawn = true;
+        break;
+      } catch (error) {
+        if (renderTask) renderTask = null;
+        if (error?.name === 'RenderingCancelledException' || epoch !== renderEpoch) throw error;
+        lastError = error;
+        console.warn('Nova tentativa de exibir a página com resolução menor:', error?.name, error?.message);
       }
-      redrawAnnotations();
     }
+    if (!drawn) throw lastError || new Error('Falha ao desenhar a página');
+    if (epoch !== renderEpoch || state.document !== doc) return;
     stage.dataset.renderState = 'ready';
+    if ($('error-banner').dataset.kind === 'render') clearError();
+    // Texto acessível e notas nativas são complementares: falhas aqui não bloqueiam a leitura.
+    try {
+      const text = await page.getTextContent();
+      if (epoch === renderEpoch) $('accessible-page-text').textContent = `Página ${state.page}. ${text.items.map(item => item.str ?? '').join(' ')}`;
+    } catch (error) {
+      console.warn('Texto acessível indisponível nesta página:', error?.name, error?.message);
+    }
+    try {
+      const annotations = await page.getAnnotations();
+      if (epoch === renderEpoch) {
+        for (const annotation of annotations) {
+          if (annotation.subtype !== 'FreeText' || annotation.titleObj?.str !== 'Multiversão' || !annotation.popupRef || !annotation.contentsObj?.str) continue;
+          const a = viewport.convertToViewportPoint(annotation.rect[0], annotation.rect[1]);
+          const b = viewport.convertToViewportPoint(annotation.rect[2], annotation.rect[3]);
+          const rect = [...a, ...b];
+          const id = `native-${annotation.id}`;
+          nativeNotes.set(id, { id, x: Math.min(rect[0], rect[2]) / viewport.width, y: Math.min(rect[1], rect[3]) / viewport.height, text: annotation.contentsObj.str, readOnly: true });
+        }
+        redrawAnnotations();
+      }
+    } catch (error) {
+      console.warn('Notas do PDF indisponíveis nesta página:', error?.name, error?.message);
+    }
   } catch (error) {
-    if (error.name === 'RenderingCancelledException' || epoch !== renderEpoch) return;
+    if (error?.name === 'RenderingCancelledException' || epoch !== renderEpoch) return;
     stage.dataset.renderState = 'error';
-    showError('Não foi possível exibir esta página. Tente outra página ou reabra o arquivo.');
-    console.error('Falha ao exibir página:', error.name);
+    showError('Não foi possível exibir esta página. Tente outra página ou reabra o arquivo.', 'render');
+    console.error('Falha ao exibir página:', error?.name, error?.message);
   } finally {
     if (epoch === renderEpoch) {
       state.rendering = false;
@@ -374,8 +406,8 @@ async function loadPdf(bytes, name, size, restored = null) {
       enableScripting: false,
       useWasm: false,
       useSystemFonts: false,
-      StandardFontDataFactory: LocalStandardFontDataFactory,
-      CMapReaderFactory: LocalCMapReaderFactory,
+      BinaryDataFactory: LocalBinaryDataFactory,
+      useWorkerFetch: false,
       cMapPacked: true,
       enableXfa: false
     });
@@ -766,7 +798,12 @@ document.addEventListener('keydown', event => {
   else if (event.key === 'Escape') { $('note-bubble').hidden = true; setMode('read'); }
 });
 
-new ResizeObserver(() => {
+let observedWidth = 0;
+new ResizeObserver(entries => {
+  // No iPhone/iPad a barra do Safari muda só a altura ao rolar; isso não exige redesenhar.
+  const width = Math.round(entries[0]?.contentRect.width || workspace.clientWidth);
+  if (Math.abs(width - observedWidth) < 2) return;
+  observedWidth = width;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => { if (state.document && !state.loading) renderPage(); }, 150);
 }).observe(workspace);
