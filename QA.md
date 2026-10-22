@@ -40,3 +40,30 @@
 
 Emulação não substitui aparelhos reais. Não prometer validação física de Samsung,
 S Pen, Apple Pencil ou Safari em iPad sem testes nesses dispositivos.
+
+## Resultados locais em 22/10/2026
+
+- Chromium desktop: arquivo de diagnóstico aberto sem senha; páginas 1, 3, 161 e
+  162 exibidas. Grifo, caneta e nota criados em camada separada.
+- Navegação, primeira/última página, zoom 120% e retorno a 100%, desfazer/refazer,
+  borracha, confirmação de limpeza e de troca de arquivo exercitados.
+- Nota aberta e editada. Marcações preservadas na navegação entre páginas,
+  mas descartadas no recarregamento, como solicitado.
+- Chromium com emulação de toque: grifo e traço criados por eventos de toque
+  reais do protocolo do navegador; nota adicionada/aberta; desfazer/refazer por toque.
+- Ajustes responsivos conferidos em 1440×1000, 375×812, 360×800, 820×1180
+  e 1280×600. Ciclo desktop → telefone → desktop manteve coordenadas dos grifos.
+- Corte na barra de ferramentas do telefone corrigido. Rodapé do tablet corrigido
+  para não quebrar as dicas palavra por palavra. Sem overflow horizontal
+  não intencional nas larguras conferidas.
+- PDF inválido, PDF truncado e PDF com senha de abertura geraram mensagens
+  específicas. Nenhuma senha foi solicitada ou tentada pelo app.
+- Nenhum POST, upload ou requisição a host externo observado. Motor, fontes e
+  ícones foram carregados do próprio host do app. Nenhum erro JavaScript não
+  tratado observado no fluxo final.
+- Contraste do texto secundário do rodapé: 5,92:1.
+- Inspeção de `public/`: PDF e foto do usuário ausentes, assim como identificadores
+  pessoais presentes na marca-d'água. O exemplo é genérico.
+- O limite de 100 MB foi conferido por inspeção de código; não foi medido como
+  limite de desempenho em aparelho real.
+- A versão web ainda precisa ser experimentada nos aparelhos físicos do usuário.

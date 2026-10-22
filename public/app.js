@@ -183,13 +183,15 @@ function renderMark(mark, draft = false, noteNumber = 1) {
   } else if (mark.type === 'note') {
     const x = mark.x * 1000;
     const y = mark.y * 1000 * pageRatio;
+    const markerScale = 1000 / Math.max(layer.clientWidth, 240);
+    const markerRadius = 22 * markerScale;
     element = svgElement('g', {
       ...attr, class: 'note-marker', transform: `translate(${x},${y})`,
       role: 'button', tabindex: '0', 'aria-label': `Nota ${noteNumber}: ${mark.text}`
     });
     element.append(
-      svgElement('circle', { r: 19, fill: '#fffbeb', stroke: color.ink, 'stroke-width': 1.4 }),
-      svgElement('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': 'Source Sans 3,sans-serif', 'font-size': 19, 'font-weight': 600, fill: color.ink }, noteNumber)
+      svgElement('circle', { r: markerRadius, fill: '#fffbeb', stroke: color.ink, 'stroke-width': 1.2 * markerScale }),
+      svgElement('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-family': 'Source Sans 3,sans-serif', 'font-size': 17 * markerScale, 'font-weight': 600, fill: color.ink }, noteNumber)
     );
   }
   if (element) {
@@ -501,8 +503,20 @@ $('file-input').addEventListener('change', event => {
 $('demo-button').addEventListener('click', openDemo);
 $('help-button').addEventListener('click', () => $('help-dialog').showModal());
 $('dismiss-error').addEventListener('click', clearError);
-document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
-document.querySelectorAll('[data-color]').forEach(button => button.addEventListener('click', () => setColor(button.dataset.color)));
+document.querySelectorAll('[data-mode]').forEach(button => {
+  button.addEventListener('click', () => setMode(button.dataset.mode));
+  // Alguns navegadores suprimem o click de compatibilidade logo após desenhar
+  // com toque. A escolha idempotente do modo também responde ao pointerup.
+  button.addEventListener('pointerup', event => {
+    if (event.pointerType === 'touch') setMode(button.dataset.mode);
+  });
+});
+document.querySelectorAll('[data-color]').forEach(button => {
+  button.addEventListener('click', () => setColor(button.dataset.color));
+  button.addEventListener('pointerup', event => {
+    if (event.pointerType === 'touch') setColor(button.dataset.color);
+  });
+});
 $('pen-width').addEventListener('change', event => { state.penWidth = Number(event.target.value); });
 $('undo-button').addEventListener('click', () => history('undo'));
 $('redo-button').addEventListener('click', () => history('redo'));
@@ -526,7 +540,12 @@ $('note-form').addEventListener('submit', event => {
   const draft = noteDraft;
   mutateAnnotations(list => draft.existingId
     ? list.map(m => m.id === draft.existingId ? { ...m, text } : m)
-    : [...list, { id: nextId(), type: 'note', x: clamp(draft.point.x, .025, .975), y: clamp(draft.point.y, .02, .98), text, color: state.color }]);
+    : [...list, {
+      id: nextId(), type: 'note',
+      x: clamp(draft.point.x, 24 / stage.clientWidth, 1 - 24 / stage.clientWidth),
+      y: clamp(draft.point.y, 24 / stage.clientHeight, 1 - 24 / stage.clientHeight),
+      text, color: state.color
+    }]);
   noteDraft = null;
   $('note-dialog').close();
 });

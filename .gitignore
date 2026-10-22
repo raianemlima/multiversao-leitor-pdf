@@ -1,6 +1,5 @@
 node_modules/
 public/vendor/
 public/fonts/
-public/demo-data.js
 core
 *.log
