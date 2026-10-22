@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#233b52">
+  <meta name="description" content="Leia PDFs no seu aparelho, com grifos e anotações temporários. Sem cadastro e sem alterar o arquivo original.">
+  <meta name="referrer" content="no-referrer">
+  <title>Leitor de estudo | PDF e anotações</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./vendor/lucide.min.js" defer></script>
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Ir para a leitura</a>
+  <header class="app-header">
+    <div class="wordmark" aria-label="Leitor de estudo"><span>Leitor</span><span class="wordmark-detail">de estudo</span></div>
+    <span class="privacy"><i data-lucide="shield-check" aria-hidden="true"></i> O arquivo fica no seu aparelho</span>
+    <div class="header-actions">
+      <button id="help-button" class="icon-button" aria-label="Como usar" title="Como usar" data-testid="button-help"><i data-lucide="circle-help"></i></button>
+      <button class="primary-button compact" data-open-file data-testid="button-open-header"><i data-lucide="folder-open"></i><span>Abrir PDF</span></button>
+    </div>
+    <input id="file-input" type="file" accept=".pdf,application/pdf" class="sr-only" aria-label="Escolher arquivo PDF" data-testid="input-file">
+  </header>
+
+  <section class="document-bar" aria-label="Documento atual">
+    <div class="document-info">
+      <i data-lucide="file-text" aria-hidden="true"></i>
+      <div class="document-labels">
+        <h1 id="file-name" data-testid="text-file-name">Seu espaço de leitura</h1>
+        <p id="file-details" data-testid="text-file-details">Sem cadastro. Sem alterar o original.</p>
+      </div>
+    </div>
+    <span id="session-label" class="session-label"><span class="status-dot"></span> Sessão temporária</span>
+  </section>
+
+  <nav id="toolbar" class="toolbar" aria-label="Ferramentas de leitura" hidden>
+    <div class="tool-group modes" role="group" aria-label="Modo de interação">
+      <button class="tool-button selected" data-mode="read" aria-pressed="true" title="Ler e rolar" data-testid="button-mode-read"><i data-lucide="hand"></i><span>Ler</span></button>
+      <button class="tool-button" data-mode="highlight" aria-pressed="false" title="Grifar: arraste sobre o trecho" data-testid="button-mode-highlight"><i data-lucide="highlighter"></i><span>Grifar</span></button>
+      <button class="tool-button" data-mode="pen" aria-pressed="false" title="Escrever à mão" data-testid="button-mode-pen"><i data-lucide="pen-line"></i><span>Caneta</span></button>
+      <button class="tool-button" data-mode="note" aria-pressed="false" title="Adicionar nota na página" data-testid="button-mode-note"><i data-lucide="sticky-note"></i><span>Nota</span></button>
+      <button class="tool-button" data-mode="eraser" aria-pressed="false" title="Toque em uma marcação para apagar" data-testid="button-mode-eraser"><i data-lucide="eraser"></i><span>Borracha</span></button>
+    </div>
+    <div class="tool-group ink-options" role="group" aria-label="Cores e espessura">
+      <div id="colors" class="color-options">
+        <button class="color-button selected" data-color="yellow" aria-label="Amarelo" aria-pressed="true" title="Amarelo" data-testid="button-color-yellow"><span style="--swatch:#f2cf49"></span></button>
+        <button class="color-button" data-color="green" aria-label="Verde" aria-pressed="false" title="Verde" data-testid="button-color-green"><span style="--swatch:#78c39f"></span></button>
+        <button class="color-button" data-color="pink" aria-label="Rosa" aria-pressed="false" title="Rosa" data-testid="button-color-pink"><span style="--swatch:#ef9ba8"></span></button>
+        <button class="color-button" data-color="blue" aria-label="Azul" aria-pressed="false" title="Azul" data-testid="button-color-blue"><span style="--swatch:#91b9ea"></span></button>
+      </div>
+      <label class="width-control" for="pen-width"><span>Traço</span><select id="pen-width" aria-label="Espessura da caneta" data-testid="select-pen-width"><option value="1.5">Fino</option><option value="2.5" selected>Médio</option><option value="4.5">Grosso</option></select></label>
+    </div>
+    <div class="tool-group history-tools" role="group" aria-label="Histórico de marcações">
+      <button id="undo-button" class="icon-button" aria-label="Desfazer nesta página" title="Desfazer" disabled data-testid="button-undo"><i data-lucide="undo-2"></i></button>
+      <button id="redo-button" class="icon-button" aria-label="Refazer nesta página" title="Refazer" disabled data-testid="button-redo"><i data-lucide="redo-2"></i></button>
+      <button id="clear-button" class="icon-button" aria-label="Apagar marcações desta página" title="Apagar marcações desta página" disabled data-testid="button-clear"><i data-lucide="trash-2"></i></button>
+    </div>
+  </nav>
+
+  <div id="error-banner" class="error-banner" role="alert" hidden data-testid="status-error"><i data-lucide="circle-alert"></i><span id="error-message"></span><button id="dismiss-error" class="icon-button" aria-label="Fechar aviso" data-testid="button-dismiss-error"><i data-lucide="x"></i></button></div>
+
+  <main id="workspace" class="workspace" tabindex="-1">
+    <section id="empty-state" class="empty-state" data-testid="section-empty">
+      <div class="empty-heading"><i data-lucide="book-open" aria-hidden="true"></i><span>UM ESPAÇO PARA SE CONCENTRAR</span></div>
+      <h2>Abra seu material.<br>Faça dele seu estudo.</h2>
+      <p>Leia, grife e anote no celular ou tablet,<br class="desktop-only"> sem modificar o PDF original.</p>
+      <button class="primary-button" data-open-file data-testid="button-open-main"><i data-lucide="folder-open"></i>Escolher um PDF</button>
+      <button id="demo-button" class="text-button" data-testid="button-demo">Experimentar com um exemplo<i data-lucide="arrow-up-right"></i></button>
+      <div class="empty-footnote"><i data-lucide="lock-keyhole" aria-hidden="true"></i><p>O PDF não é enviado para servidor.<br>As marcações duram apenas esta sessão.</p></div>
+    </section>
+
+    <section id="reader" class="reader" aria-label="Página do PDF" hidden data-testid="section-reader">
+      <div id="page-stage" class="page-stage" data-testid="page-stage" data-render-state="idle">
+        <canvas id="pdf-canvas" aria-label="Página do documento PDF" data-testid="canvas-pdf"></canvas>
+        <svg id="annotation-layer" class="annotation-layer" aria-label="Camada de marcações temporárias" data-testid="layer-annotations" viewBox="0 0 1000 1414" preserveAspectRatio="none"></svg>
+        <div id="note-bubble" class="note-bubble" hidden data-testid="note-bubble"><div class="note-bubble-heading"><span>Nota de estudo</span><button id="close-note-bubble" class="icon-button" aria-label="Fechar nota" data-testid="button-close-note"><i data-lucide="x"></i></button></div><p id="note-bubble-text"></p><button id="edit-note-button" class="text-button" data-testid="button-edit-note">Editar nota<i data-lucide="pencil"></i></button></div>
+        <div id="render-loading" class="render-loading" hidden role="status"><span class="loading-line"></span><span>Preparando a página…</span></div>
+      </div>
+      <p id="accessible-page-text" class="sr-only"></p>
+    </section>
+    <div id="document-loading" class="document-loading" hidden role="status" data-testid="status-loading"><i data-lucide="file-text"></i><p>Abrindo seu PDF no aparelho…</p></div>
+  </main>
+
+  <footer class="reader-footer">
+    <div id="mode-hint" class="mode-hint" role="status" aria-live="polite" data-testid="text-mode-hint"><i data-lucide="info"></i><span>Sem conta, sem envio do arquivo, sem salvar alterações.</span></div>
+    <div id="reader-controls" class="reader-controls" hidden>
+      <div class="pagination" aria-label="Navegação de páginas">
+        <button id="prev-page" class="icon-button" aria-label="Página anterior" title="Página anterior" data-testid="button-prev-page"><i data-lucide="chevron-left"></i></button>
+        <label for="page-number" class="sr-only">Ir para a página</label><input id="page-number" type="number" min="1" value="1" inputmode="numeric" aria-label="Ir para a página" data-testid="input-page">
+        <span class="page-total">de <span id="page-total" data-testid="text-page-total">0</span></span>
+        <button id="next-page" class="icon-button" aria-label="Próxima página" title="Próxima página" data-testid="button-next-page"><i data-lucide="chevron-right"></i></button>
+      </div>
+      <div class="zoom-controls" role="group" aria-label="Zoom">
+        <button id="zoom-out" class="icon-button" aria-label="Diminuir zoom" title="Diminuir zoom" data-testid="button-zoom-out"><i data-lucide="minus"></i></button><span id="zoom-value" data-testid="text-zoom">100%</span><button id="zoom-in" class="icon-button" aria-label="Aumentar zoom" title="Aumentar zoom" data-testid="button-zoom-in"><i data-lucide="plus"></i></button>
+        <button id="fit-width" class="icon-button" aria-label="Ajustar à largura" title="Ajustar à largura" data-testid="button-fit-width"><i data-lucide="scan-line"></i></button>
+      </div>
+    </div>
+    <p id="temporary-notice" class="temporary-notice">Ao fechar ou recarregar, as anotações são apagadas.</p>
+  </footer>
+
+  <dialog id="help-dialog" class="app-dialog">
+    <form method="dialog"><button class="icon-button dialog-close" aria-label="Fechar ajuda" data-testid="button-close-help"><i data-lucide="x"></i></button></form>
+    <span class="eyebrow">LEITURA SEM COMPLICAÇÃO</span><h2>O original fica intacto.</h2>
+    <p>Abra um PDF do seu aparelho. As ferramentas criam uma camada de estudo separada, sem pedir a senha do proprietário para salvar.</p>
+    <ul class="help-list">
+      <li><i data-lucide="hand"></i><div><strong>Ler</strong><span>Use o dedo para rolar. Navegue e ajuste o zoom na barra inferior.</span></div></li>
+      <li><i data-lucide="highlighter"></i><div><strong>Grifar</strong><span>Escolha uma cor e arraste um retângulo sobre o trecho desejado.</span></div></li>
+      <li><i data-lucide="pen-line"></i><div><strong>Caneta</strong><span>Escreva com o dedo, mouse ou caneta compatível com o navegador.</span></div></li>
+      <li><i data-lucide="sticky-note"></i><div><strong>Nota</strong><span>Toque na página para adicionar uma nota. No modo Ler, toque no marcador para reler.</span></div></li>
+      <li><i data-lucide="eraser"></i><div><strong>Borracha</strong><span>Toque na marcação para removê-la. Use desfazer se precisar.</span></div></li>
+    </ul>
+    <p class="dialog-notice"><strong>Só nesta sessão.</strong> Não há salvamento ou exportação. Fechar, recarregar ou trocar o PDF apaga as marcações. PDFs que exigem uma senha para abrir não são desbloqueados por este app.</p>
+    <form method="dialog"><button class="primary-button wide" data-testid="button-help-understood">Entendi</button></form>
+  </dialog>
+
+  <dialog id="note-dialog" class="app-dialog note-dialog">
+    <h2 id="note-dialog-title">Uma ideia para lembrar</h2><p>A nota fica nesta página, apenas durante a sessão.</p>
+    <form id="note-form">
+      <label for="note-input">Sua anotação</label><textarea id="note-input" rows="5" maxlength="1000" placeholder="Escreva uma dúvida, conexão ou lembrete…" required data-testid="input-note"></textarea>
+      <div class="dialog-actions"><button id="cancel-note" type="button" class="secondary-button" data-testid="button-cancel-note">Cancelar</button><button type="submit" class="primary-button" data-testid="button-add-note">Adicionar nota</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="app-dialog confirm-dialog">
+    <h2 id="confirm-title"></h2><p id="confirm-message"></p>
+    <div class="dialog-actions"><button id="confirm-cancel" class="secondary-button" data-testid="button-confirm-cancel">Cancelar</button><button id="confirm-accept" class="primary-button" data-testid="button-confirm-accept">Continuar</button></div>
+  </dialog>
+  <noscript>Ative o JavaScript para abrir o leitor. Seus arquivos continuam no seu aparelho.</noscript>
+</body>
+</html>
