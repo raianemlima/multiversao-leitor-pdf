@@ -50,7 +50,14 @@ O app não remove senhas de abertura, DRM ou permissões. O navegador pode apaga
 dados locais. A prévia não é um endereço de instalação e bloqueia download e
 persistência; publicação HTTPS própria permanece pendente de autorização.
 
-Validação da prévia hospedada será registrada após a atualização do artefato.
+Prévia hospedada atualizada no mesmo artefato e validada em contexto novo:
+título e logotipo corretos, exemplo de três páginas, grifo e geração da cópia,
+contatos de suporte e aviso explícito de download bloqueado nessa prévia.
+Também foi validado iframe opaco com sandbox: ECA protegido de 162 páginas,
+grifo e geração da cópia passaram sem erros; botão de download permaneceu
+corretamente bloqueado. Telas hospedadas de 1440×1000 e 375×812 inspecionadas,
+sem transbordamento; contatos e botão Entendi acessíveis no diálogo rolável.
+Sessões de teste encerradas. Publicação pública não executada.
 
 ## Escopo
 
