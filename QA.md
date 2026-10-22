@@ -1,15 +1,70 @@
-# Critérios de aceitação e testes
+# Critérios de aceitação e testes | Multiversão PWA
+
+## Resultado da PWA em 22/10/2026
+
+Versão dos recursos offline: `357e56a44c47`. Motor PDF.js `6.4.299`.
+
+A dependência foi atualizada após a auditoria identificar uma versão afetada pelo
+[alerta CVE-2026-16633](https://github.com/advisories/GHSA-hq66-cqwq-w95j).
+Nova auditoria npm: zero vulnerabilidades conhecidas reportadas.
+Scripting e avaliação dinâmica estão explicitamente desativados.
+Os testes abaixo foram repetidos após a atualização; exportação unitária executada
+com Node.js 22.23.4. Adaptadas as APIs de permissões Set, encerramento por
+loadingTask e coordenadas de comentários da versão 6.
+
+- Marca Multiversão: imagem original preservada, recortes completos no cabeçalho
+  e nos ícones, abertura, manifesto, título e exemplo genérico.
+- Contatos conferidos: multiversaoempreendimentos@gmail.com e (88) 921957455.
+  Link WhatsApp ativado e destino com telefone `5588921957455` confirmado.
+  E-mail ativado em navegador sem cliente de e-mail; endereço segue visível.
+- Leitura do ECA protegido: 162 páginas. Página 3 com grifo, caneta e nota.
+- Sem internet: recarregamento, botão Retomar, página 3 e três marcações
+  recuperadas, geração e download real de uma cópia PDF. Sem erros de execução.
+- Cópia baixada: qpdf sem erro de estrutura; 162 páginas; texto da capa e
+  marca-d'água preservados; bytes originais mantidos como prefixo integral;
+  parâmetros da criptografia mantidos; Highlight, Ink e FreeText/Popup.
+- Reabertura: comentário nativo da cópia é acessível no app como nota do arquivo,
+  sem duplicação. Marcações novas e as da última leitura seguem editáveis.
+- Exportação repetida: sem duplicar anotações. PDF que proíbe anotação:
+  gravação das marcações recusada, sem remover proteção.
+- Fluxos de leitura, cores, espessura, grifo, caneta, nota e edição, borracha,
+  desfazer/refazer, limpar/cancelar, navegação, zoom e ajustar à largura passaram.
+- Apagar leitura local: cancelamento e confirmação passaram; arquivo externo
+  não é removido. Documento local desaparece da retomada.
+- Arquivo com cabeçalho inválido: rejeitado com aviso, mantendo a leitura.
+- Atualização do service worker: preservou os três marcadores locais.
+- Layouts 1440×1000, 375×812, 820×1180 e 1280×600 inspecionados, sem cortes de
+  controles nem transbordamento horizontal. Redimensionamento preservou marcas.
+- Toque emulado em 375×812: grifo, caneta, cor e retorno ao modo Ler passaram.
+- Chrome em contexto privado identificou apenas `in-incognito` na checagem de
+  instalação. Instalação física não foi verificada nesse contexto.
+- Requisições do app: somente GET para recursos próprios. Abrir PDF, guardar
+  leitura e gerar cópia não fizeram upload ou POST.
+
+Correções verificadas: normalização de respostas redirecionadas no cache do
+service worker; gravação local imediata por ação concluída, com status coerente;
+bloqueio de comandos durante troca de documento; recortes proporcionais da marca.
+
+Limites: Samsung/S Pen, iPad/Safari e Apple Pencil físicos ainda não testados.
+O app não remove senhas de abertura, DRM ou permissões. O navegador pode apagar
+dados locais. A prévia não é um endereço de instalação e bloqueia download e
+persistência; publicação HTTPS própria permanece pendente de autorização.
+
+Validação da prévia hospedada será registrada após a atualização do artefato.
 
 ## Escopo
 
-- App web estático, em português, sem Vercel, backend, cadastro ou senha.
+- PWA estática, em português, sem Vercel, backend, cadastro ou senha.
 - PDFs são selecionados localmente. Nenhum arquivo do usuário integra a publicação.
 - Não usar cookies, localStorage, sessionStorage ou IndexedDB.
-- Não regravar PDFs nem remover a proteção. Anotações são apenas estado em memória.
-- Não oferecer salvar, exportar, baixar ou imprimir.
+- Não sobrescrever o original nem remover a proteção.
+- Exportar uma cópia PDF com anotações nativas, preservando texto e marca-d'água.
 - Abrir o ECA de 162 páginas fornecido, sem senha do proprietário.
-- Diferenciar a leitura do PDF de sua camada temporária de marcações.
-- Avisar que as marcações somem ao fechar/recarregar ou confirmar troca de arquivo.
+- Guardar a última leitura em CacheStorage quando disponível.
+- Service worker, manifesto e ícones de instalação com a marca Multiversão.
+- Sem rede: recarregar, retomar leitura, marcar, navegar e exportar.
+- Na prévia, explicar claramente os limites de iframe e de instalação.
+- Marca e contatos comerciais exatamente como fornecidos.
 
 ## Fluxos e controles
 
@@ -22,9 +77,15 @@
 7. Desfazer, refazer, apagar página (cancelar/confirmar), marcações independentes por página.
 8. Trocar PDF: alerta de perda de marcações, cancelar/confirmar.
 9. Ajuda: abrir/fechar por botão e Escape; foco e nomes acessíveis.
-10. Recarregar: sem documento ou marcações persistentes.
+10. Recarregar: oferecer retomar documento e marcações locais.
 11. Erros: arquivo não PDF, PDF truncado, PDF com senha de abertura, limite de tamanho.
 12. Privacidade: registrar requisições após seleção, sem upload/POST ou conteúdo do PDF.
+13. Exportar, baixar pelo navegador, validar com outro motor e reabrir no app.
+14. Não duplicar anotações em exportações repetidas.
+15. PDF que proíbe anotação: recusar exportação das marcações sem remover proteção.
+16. Apagar leitura local e confirmar ausência após recarregar.
+17. Manifesto e cache completo: avaliar instalação com auditoria do navegador.
+18. Contatos de suporte, imagens da marca e prévia com aviso de restrições.
 
 ## Matriz visual e responsiva
 
@@ -41,7 +102,10 @@
 Emulação não substitui aparelhos reais. Não prometer validação física de Samsung,
 S Pen, Apple Pencil ou Safari em iPad sem testes nesses dispositivos.
 
-## Resultados locais em 22/10/2026
+## Histórico da versão inicial em 22/10/2026
+
+Os resultados abaixo documentam a v1 sem salvamento. O novo requisito de PWA com
+persistência local e exportação substitui a perda de marcações no recarregamento.
 
 - Chromium desktop: arquivo de diagnóstico aberto sem senha; páginas 1, 3, 161 e
   162 exibidas. Grifo, caneta e nota criados em camada separada.

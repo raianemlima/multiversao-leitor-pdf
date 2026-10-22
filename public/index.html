@@ -3,10 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#233b52">
-  <meta name="description" content="Leia PDFs no seu aparelho, com grifos e anotações temporários. Sem cadastro e sem alterar o arquivo original.">
+  <meta name="theme-color" content="#0868b8">
+  <meta name="description" content="Multiversão: leitor PDF instalável, com uso offline, grifos, notas e exportação no próprio aparelho.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Multiversão">
   <meta name="referrer" content="no-referrer">
-  <title>Leitor de estudo | PDF e anotações</title>
+  <title>Multiversão | Leitor PDF offline</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" href="./brand/icon-192.png">
+  <link rel="apple-touch-icon" href="./brand/icon-192.png">
   <link rel="stylesheet" href="./style.css">
   <script src="./vendor/lucide.min.js" defer></script>
   <script type="module" src="./app.js"></script>
@@ -14,7 +20,7 @@
 <body>
   <a class="skip-link" href="#workspace">Ir para a leitura</a>
   <header class="app-header">
-    <div class="wordmark" aria-label="Leitor de estudo"><span>Leitor</span><span class="wordmark-detail">de estudo</span></div>
+    <div class="wordmark" aria-label="Multiversão, Leitor PDF"><img src="./brand/wordmark.webp" alt="Multiversão" width="174" height="32"><span class="wordmark-detail">LEITOR PDF</span></div>
     <span class="privacy"><i data-lucide="shield-check" aria-hidden="true"></i> O arquivo fica no seu aparelho</span>
     <div class="header-actions">
       <button id="help-button" class="icon-button" aria-label="Como usar" title="Como usar" data-testid="button-help"><i data-lucide="circle-help"></i></button>
@@ -31,8 +37,13 @@
         <p id="file-details" data-testid="text-file-details">Sem cadastro. Sem alterar o original.</p>
       </div>
     </div>
-    <span id="session-label" class="session-label"><span class="status-dot"></span> Sessão temporária</span>
+    <div class="document-actions">
+      <button id="pwa-button" class="offline-button" title="Instalação e uso offline" data-testid="button-pwa"><span class="status-dot"></span><span id="pwa-label" data-testid="text-pwa-status">Preparando app…</span><i data-lucide="download"></i></button>
+      <button id="export-button" class="primary-button compact" hidden data-testid="button-export"><i data-lucide="file-down"></i><span>Salvar PDF</span></button>
+    </div>
   </section>
+
+  <div id="preview-notice" class="preview-notice" hidden data-testid="status-preview">Prévia de demonstração. Instalação, arquivos locais e uso offline precisam do endereço próprio do app.</div>
 
   <nav id="toolbar" class="toolbar" aria-label="Ferramentas de leitura" hidden>
     <div class="tool-group modes" role="group" aria-label="Modo de interação">
@@ -62,18 +73,19 @@
 
   <main id="workspace" class="workspace" tabindex="-1">
     <section id="empty-state" class="empty-state" data-testid="section-empty">
-      <div class="empty-heading"><i data-lucide="book-open" aria-hidden="true"></i><span>UM ESPAÇO PARA SE CONCENTRAR</span></div>
-      <h2>Abra seu material.<br>Faça dele seu estudo.</h2>
-      <p>Leia, grife e anote no celular ou tablet,<br class="desktop-only"> sem modificar o PDF original.</p>
+      <div class="empty-heading"><img src="./brand/logo.webp" alt="Marca Multiversão" width="230" height="153"><span>SEU LEITOR PDF, NO SEU APARELHO</span></div>
+      <h2>Seu estudo, com você.</h2>
+      <p>Leia, grife, anote e salve uma cópia do seu PDF.<br class="desktop-only"> O original continua intacto.</p>
       <button class="primary-button" data-open-file data-testid="button-open-main"><i data-lucide="folder-open"></i>Escolher um PDF</button>
+      <button id="resume-button" class="secondary-button resume-button" hidden data-testid="button-resume"><i data-lucide="history"></i><span id="resume-label">Retomar última leitura</span></button>
       <button id="demo-button" class="text-button" data-testid="button-demo">Experimentar com um exemplo<i data-lucide="arrow-up-right"></i></button>
-      <div class="empty-footnote"><i data-lucide="lock-keyhole" aria-hidden="true"></i><p>O PDF não é enviado para servidor.<br>As marcações duram apenas esta sessão.</p></div>
+      <div class="empty-footnote"><i data-lucide="lock-keyhole" aria-hidden="true"></i><p>Seus PDFs ficam no aparelho, sem upload.<br>Instale o app para estudar também sem internet.</p></div>
     </section>
 
     <section id="reader" class="reader" aria-label="Página do PDF" hidden data-testid="section-reader">
       <div id="page-stage" class="page-stage" data-testid="page-stage" data-render-state="idle">
         <canvas id="pdf-canvas" aria-label="Página do documento PDF" data-testid="canvas-pdf"></canvas>
-        <svg id="annotation-layer" class="annotation-layer" aria-label="Camada de marcações temporárias" data-testid="layer-annotations" viewBox="0 0 1000 1414" preserveAspectRatio="none"></svg>
+        <svg id="annotation-layer" class="annotation-layer" aria-label="Camada de marcações" data-testid="layer-annotations" viewBox="0 0 1000 1414" preserveAspectRatio="none"></svg>
         <div id="note-bubble" class="note-bubble" hidden data-testid="note-bubble"><div class="note-bubble-heading"><span>Nota de estudo</span><button id="close-note-bubble" class="icon-button" aria-label="Fechar nota" data-testid="button-close-note"><i data-lucide="x"></i></button></div><p id="note-bubble-text"></p><button id="edit-note-button" class="text-button" data-testid="button-edit-note">Editar nota<i data-lucide="pencil"></i></button></div>
         <div id="render-loading" class="render-loading" hidden role="status"><span class="loading-line"></span><span>Preparando a página…</span></div>
       </div>
@@ -83,7 +95,7 @@
   </main>
 
   <footer class="reader-footer">
-    <div id="mode-hint" class="mode-hint" role="status" aria-live="polite" data-testid="text-mode-hint"><i data-lucide="info"></i><span>Sem conta, sem envio do arquivo, sem salvar alterações.</span></div>
+    <div id="mode-hint" class="mode-hint" role="status" aria-live="polite" data-testid="text-mode-hint"><i data-lucide="info"></i><span>Multiversão. Sem conta e sem envio dos PDFs.</span></div>
     <div id="reader-controls" class="reader-controls" hidden>
       <div class="pagination" aria-label="Navegação de páginas">
         <button id="prev-page" class="icon-button" aria-label="Página anterior" title="Página anterior" data-testid="button-prev-page"><i data-lucide="chevron-left"></i></button>
@@ -96,13 +108,13 @@
         <button id="fit-width" class="icon-button" aria-label="Ajustar à largura" title="Ajustar à largura" data-testid="button-fit-width"><i data-lucide="scan-line"></i></button>
       </div>
     </div>
-    <p id="temporary-notice" class="temporary-notice">Ao fechar ou recarregar, as anotações são apagadas.</p>
+    <p id="temporary-notice" class="temporary-notice" data-testid="text-local-status">Salve uma cópia PDF para guardar seu estudo.</p>
   </footer>
 
   <dialog id="help-dialog" class="app-dialog">
     <form method="dialog"><button class="icon-button dialog-close" aria-label="Fechar ajuda" data-testid="button-close-help"><i data-lucide="x"></i></button></form>
     <span class="eyebrow">LEITURA SEM COMPLICAÇÃO</span><h2>O original fica intacto.</h2>
-    <p>Abra um PDF do seu aparelho. As ferramentas criam uma camada de estudo separada, sem pedir a senha do proprietário para salvar.</p>
+    <p>Abra um PDF do seu aparelho. As ferramentas criam marcações separadas do original. Use Salvar PDF para gerar uma cópia com suas anotações, quando o arquivo permitir anotação.</p>
     <ul class="help-list">
       <li><i data-lucide="hand"></i><div><strong>Ler</strong><span>Use o dedo para rolar. Navegue e ajuste o zoom na barra inferior.</span></div></li>
       <li><i data-lucide="highlighter"></i><div><strong>Grifar</strong><span>Escolha uma cor e arraste um retângulo sobre o trecho desejado.</span></div></li>
@@ -110,12 +122,13 @@
       <li><i data-lucide="sticky-note"></i><div><strong>Nota</strong><span>Toque na página para adicionar uma nota. No modo Ler, toque no marcador para reler.</span></div></li>
       <li><i data-lucide="eraser"></i><div><strong>Borracha</strong><span>Toque na marcação para removê-la. Use desfazer se precisar.</span></div></li>
     </ul>
-    <p class="dialog-notice"><strong>Só nesta sessão.</strong> Não há salvamento ou exportação. Fechar, recarregar ou trocar o PDF apaga as marcações. PDFs que exigem uma senha para abrir não são desbloqueados por este app.</p>
+    <p class="dialog-notice"><strong>No seu aparelho.</strong> O PWA guarda a última leitura localmente quando o navegador permite. Use Salvar PDF como sua cópia de segurança. As notas são comentários com marcador “Nota” na cópia exportada; abra-os em um leitor compatível. Não removemos a proteção, a marca-d'água ou uma senha de abertura.</p>
+    <section class="brand-support" aria-label="Suporte Multiversão"><h3>Multiversão · suporte</h3><a href="mailto:multiversaoempreendimentos@gmail.com" data-testid="link-support-email">multiversaoempreendimentos@gmail.com</a><a href="https://wa.me/5588921957455" target="_blank" rel="noopener noreferrer" data-testid="link-support-whatsapp">WhatsApp: (88) 921957455</a></section>
     <form method="dialog"><button class="primary-button wide" data-testid="button-help-understood">Entendi</button></form>
   </dialog>
 
   <dialog id="note-dialog" class="app-dialog note-dialog">
-    <h2 id="note-dialog-title">Uma ideia para lembrar</h2><p>A nota fica nesta página, apenas durante a sessão.</p>
+    <h2 id="note-dialog-title">Uma ideia para lembrar</h2><p>A nota acompanha esta página e pode ser incluída na cópia PDF.</p>
     <form id="note-form">
       <label for="note-input">Sua anotação</label><textarea id="note-input" rows="5" maxlength="1000" placeholder="Escreva uma dúvida, conexão ou lembrete…" required data-testid="input-note"></textarea>
       <div class="dialog-actions"><button id="cancel-note" type="button" class="secondary-button" data-testid="button-cancel-note">Cancelar</button><button type="submit" class="primary-button" data-testid="button-add-note">Adicionar nota</button></div>
@@ -125,6 +138,27 @@
   <dialog id="confirm-dialog" class="app-dialog confirm-dialog">
     <h2 id="confirm-title"></h2><p id="confirm-message"></p>
     <div class="dialog-actions"><button id="confirm-cancel" class="secondary-button" data-testid="button-confirm-cancel">Cancelar</button><button id="confirm-accept" class="primary-button" data-testid="button-confirm-accept">Continuar</button></div>
+  </dialog>
+  <dialog id="pwa-dialog" class="app-dialog">
+    <form method="dialog"><button class="icon-button dialog-close" aria-label="Fechar instalação" data-testid="button-close-pwa"><i data-lucide="x"></i></button></form>
+    <span class="eyebrow">MULTIVERSÃO NO SEU APARELHO</span><h2>Instale. Leve seu estudo.</h2>
+    <p id="pwa-explanation">Abra o endereço próprio do app com internet e aguarde o aviso “Pronto para usar offline”. Depois, instale na tela inicial.</p>
+    <ul class="help-list">
+      <li><i data-lucide="smartphone"></i><div><strong>Samsung / Android</strong><span>No Chrome ou navegador compatível, abra o menu e procure “Instalar app” ou “Adicionar à tela inicial”.</span></div></li>
+      <li><i data-lucide="tablet"></i><div><strong>iPad / iPhone</strong><span>Abra no Safari, toque em Compartilhar e em “Adicionar à Tela de Início”.</span></div></li>
+      <li><i data-lucide="wifi-off"></i><div><strong>Sem internet</strong><span>Abra o app instalado e retome a última leitura, ou escolha um PDF já baixado no aparelho.</span></div></li>
+    </ul>
+    <p class="dialog-notice">O navegador pode limpar dados locais. Uma cópia salva em Arquivos/Downloads é seu backup. Seus PDFs não são incluídos na publicação do app.</p>
+    <button id="install-button" class="primary-button wide" hidden data-testid="button-install"><i data-lucide="download"></i>Instalar no aparelho</button>
+    <button id="clear-local-button" class="text-button" hidden data-testid="button-clear-local"><i data-lucide="trash-2"></i>Apagar leitura guardada neste aparelho</button>
+  </dialog>
+  <dialog id="export-dialog" class="app-dialog">
+    <form method="dialog"><button class="icon-button dialog-close" aria-label="Fechar exportação" data-testid="button-close-export"><i data-lucide="x"></i></button></form>
+    <span class="eyebrow">UMA CÓPIA PARA GUARDAR</span><h2>Seu PDF está pronto.</h2>
+    <p id="export-details" data-testid="text-export-details"></p>
+    <p id="export-context-message" class="dialog-notice"></p>
+    <div class="dialog-actions export-actions"><button id="save-device-button" class="primary-button" data-testid="button-save-device"><i data-lucide="download"></i>Baixar PDF</button><button id="share-device-button" class="secondary-button" hidden data-testid="button-share-device"><i data-lucide="share-2"></i>Compartilhar / Arquivos</button></div>
+    <p id="export-result" class="export-result" role="status" data-testid="status-export-result"></p>
   </dialog>
   <noscript>Ative o JavaScript para abrir o leitor. Seus arquivos continuam no seu aparelho.</noscript>
 </body>

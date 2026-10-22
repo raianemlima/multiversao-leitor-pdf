@@ -1,5 +1,6 @@
 /**
- * Modelo apenas em memória. Não existe banco, conta, API ou persistência.
+ * Modelo de leitura. O PWA pode manter a última leitura no CacheStorage local.
+ * Não existe conta, API ou servidor de documentos.
  * Coordenadas são frações da página, para acompanhar zoom e redimensionamento.
  *
  * @typedef {{x:number,y:number}} Point
@@ -21,6 +22,8 @@ export const COLORS = {
 export function createState() {
   return {
     document: null,
+    originalBytes: null,
+    revision: 0,
     fileName: '',
     fileSize: 0,
     page: 1,
@@ -31,6 +34,7 @@ export function createState() {
     pages: new Map(),
     loading: false,
     rendering: false,
+    exporting: false,
     draft: null
   };
 }

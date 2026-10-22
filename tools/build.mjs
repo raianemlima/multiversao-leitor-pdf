@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pub = path.join(root, 'public');
@@ -32,4 +33,24 @@ for (const sub of ['standard_fonts', 'cmaps']) {
   }
 }
 await fs.writeFile(path.join(vendor, 'pdf-resources.js'), `export default ${JSON.stringify(resourceMap)};\n`);
-console.log('Build estático concluído. Nenhum PDF de usuário incluído.');
+async function listFiles(folder, prefix = './') {
+  const result = [];
+  for (const item of await fs.readdir(folder, { withFileTypes: true })) {
+    if (item.name === 'sw.js') continue;
+    const relative = `${prefix}${item.name}`;
+    if (item.isDirectory()) result.push(...await listFiles(path.join(folder, item.name), `${relative}/`));
+    else result.push(relative);
+  }
+  return result.sort();
+}
+const assets = await listFiles(pub);
+const hash = createHash('sha256');
+const template = await fs.readFile(path.join(root, 'tools/sw-template.js'), 'utf8');
+hash.update(template);
+for (const name of assets) {
+  hash.update(name);
+  hash.update(await fs.readFile(path.join(pub, name)));
+}
+const version = hash.digest('hex').slice(0, 12);
+await fs.writeFile(path.join(pub, 'sw.js'), template.replace('__VERSION__', version).replace('__ASSETS__', JSON.stringify(assets)));
+console.log(`PWA Multiversão pronta: ${assets.length} recursos offline, versão ${version}. Nenhum PDF de usuário incluído.`);

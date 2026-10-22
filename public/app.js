@@ -1,4 +1,6 @@
 import { createState, pageAnnotations, COLORS } from './schema.js';
+import { exportAnnotatedPdf } from './export-pdf.js';
+import { initializePwa, installPwa, pwaStatus, isPreview, storeReading, getStoredReading, clearStoredReading } from './pwa.js';
 
 const $ = id => document.getElementById(id);
 const state = createState();
@@ -19,6 +21,11 @@ let noteDraft = null;
 let activeNoteId = null;
 let confirmationAction = null;
 let resizeTimer;
+let persistQueue = Promise.resolve();
+let persistRequested = 0;
+let exportFile = null;
+let savedLocally = false;
+let nativeNotes = new Map();
 
 const hints = {
   read: 'Role para ler. Toque nos marcadores para reler as notas.',
@@ -33,10 +40,22 @@ const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const nextId = () => `mark-${++uid}`;
 const hasAnnotations = () => [...state.pages.values()].some(p => p.items.length > 0);
 const toBytes = base64 => Uint8Array.from(atob(base64), char => char.charCodeAt(0));
+async function destroyDocument(document) {
+  if (!document) return;
+  if (document.loadingTask?.destroy) await document.loadingTask.destroy();
+  else await document.destroy?.();
+}
 
 function initIcons() {
   window.lucide?.createIcons({ attrs: { 'aria-hidden': 'true' } });
 }
+document.querySelectorAll('img').forEach(img => img.addEventListener('error', () => {
+  img.hidden = true;
+  const fallback = document.createElement('span');
+  fallback.textContent = 'Multiversão';
+  fallback.className = 'brand-fallback';
+  img.after(fallback);
+}));
 
 function showError(message) {
   $('error-message').textContent = message;
@@ -112,24 +131,60 @@ function setColor(color) {
 
 function updateControls() {
   const loaded = !!state.document;
+  const busy = state.loading || state.rendering || state.exporting;
   $('toolbar').hidden = !loaded;
   $('reader-controls').hidden = !loaded;
   document.body.classList.toggle('has-document', loaded);
+  $('export-button').hidden = !loaded;
+  $('export-button').disabled = busy;
+  $('export-button').querySelector('span').textContent = state.exporting ? 'Gerando…' : 'Salvar PDF';
   $('page-number').value = state.page;
   $('page-number').max = state.document?.numPages ?? 1;
   $('page-total').textContent = state.document?.numPages ?? 0;
-  $('prev-page').disabled = !loaded || state.page <= 1 || state.rendering;
-  $('next-page').disabled = !loaded || state.page >= state.document.numPages || state.rendering;
-  $('page-number').disabled = state.rendering;
-  $('zoom-out').disabled = state.zoom <= .6 || state.rendering;
-  $('zoom-in').disabled = state.zoom >= 2.4 || state.rendering;
+  $('prev-page').disabled = !loaded || state.page <= 1 || busy;
+  $('next-page').disabled = !loaded || state.page >= state.document.numPages || busy;
+  $('page-number').disabled = !loaded || busy;
+  $('zoom-out').disabled = !loaded || state.zoom <= .6 || busy;
+  $('zoom-in').disabled = !loaded || state.zoom >= 2.4 || busy;
+  $('fit-width').disabled = !loaded || busy;
+  $('pen-width').disabled = !loaded || busy;
+  document.querySelectorAll('[data-mode],[data-color]').forEach(button => { button.disabled = !loaded || busy; });
+  document.querySelectorAll('[data-open-file],#demo-button').forEach(button => { button.disabled = state.loading || state.exporting; });
+  $('clear-local-button').disabled = state.loading || state.exporting;
   $('zoom-value').textContent = `${Math.round(state.zoom * 100)}%`;
   if (loaded) {
     const marks = pageAnnotations(state);
-    $('undo-button').disabled = !marks.undo.length || state.rendering;
-    $('redo-button').disabled = !marks.redo.length || state.rendering;
-    $('clear-button').disabled = !marks.items.length || state.rendering;
+    $('undo-button').disabled = !marks.undo.length || busy;
+    $('redo-button').disabled = !marks.redo.length || busy;
+    $('clear-button').disabled = !marks.items.length || busy;
   }
+}
+
+function persistReading(includeOriginal = false) {
+  if (!state.document || !pwaStatus().localAccess) return;
+  const ticket = ++persistRequested;
+  savedLocally = false;
+  $('temporary-notice').textContent = 'Guardando a leitura no aparelho…';
+  persistQueue = persistQueue.then(async () => {
+    const saved = await storeReading(state, includeOriginal);
+    if (ticket !== persistRequested) return;
+    savedLocally = saved;
+    $('temporary-notice').textContent = saved
+      ? 'Leitura guardada no aparelho. Salve o PDF como backup.'
+      : 'Não foi possível guardar localmente. Use Salvar PDF.';
+    await refreshResumeButton();
+  }).catch(() => {
+    if (ticket !== persistRequested) return;
+    savedLocally = false;
+    $('temporary-notice').textContent = 'Use Salvar PDF para guardar suas marcações.';
+  });
+}
+
+async function refreshResumeButton() {
+  const stored = await getStoredReading();
+  $('resume-button').hidden = !stored;
+  $('clear-local-button').hidden = !stored;
+  $('resume-label').textContent = stored ? `Retomar: ${stored.name}` : 'Retomar última leitura';
 }
 
 function mutateAnnotations(change) {
@@ -141,8 +196,10 @@ function mutateAnnotations(change) {
   if (page.undo.length > 100) page.undo.shift();
   page.items = next;
   page.redo = [];
+  state.revision = Math.max(Date.now(), (state.revision || 0) + 1);
   redrawAnnotations();
   updateControls();
+  persistReading();
 }
 
 function history(direction) {
@@ -152,9 +209,11 @@ function history(direction) {
   const target = direction === 'undo' ? page.redo : page.undo;
   target.push(clone(page.items));
   page.items = source.pop();
+  state.revision = Math.max(Date.now(), (state.revision || 0) + 1);
   $('note-bubble').hidden = true;
   redrawAnnotations();
   updateControls();
+  persistReading();
 }
 
 function svgElement(name, attributes, text) {
@@ -209,6 +268,17 @@ function redrawAnnotations() {
     if (mark.type === 'note') noteNumber++;
     renderMark(mark, false, noteNumber);
   }
+  for (const mark of nativeNotes.values()) {
+    const scale = 1000 / Math.max(layer.clientWidth, 240);
+    const target = svgElement('g', {
+      class: 'note-marker native-note-target',
+      'data-annotation-id': mark.id,
+      role: 'button', tabindex: '0', 'aria-label': mark.text,
+      transform: `translate(${mark.x * 1000},${mark.y * 1000 * pageRatio})`
+    });
+    target.append(svgElement('rect', { x: -8 * scale, y: -8 * scale, width: 60 * scale, height: 44 * scale, fill: 'transparent' }));
+    layer.append(target);
+  }
   if (state.draft) renderMark(state.draft, true);
 }
 
@@ -216,6 +286,7 @@ async function renderPage() {
   if (!state.document) return;
   const epoch = ++renderEpoch;
   const doc = state.document;
+  nativeNotes = new Map();
   state.rendering = true;
   if (renderTask) {
     renderTask.cancel();
@@ -243,7 +314,7 @@ async function renderPage() {
     canvas.style.width = `${viewport.width}px`;
     canvas.style.height = `${viewport.height}px`;
     canvas.setAttribute('aria-label', `Página ${state.page} de ${doc.numPages}`);
-    layer.setAttribute('aria-label', `Marcações temporárias da página ${state.page}`);
+    layer.setAttribute('aria-label', `Marcações da página ${state.page}`);
     redrawAnnotations();
     const localTask = page.render({
       canvasContext: canvas.getContext('2d'),
@@ -255,9 +326,21 @@ async function renderPage() {
     await localTask.promise;
     if (epoch !== renderEpoch || state.document !== doc) return;
     renderTask = null;
-    stage.dataset.renderState = 'ready';
     const text = await page.getTextContent();
     if (epoch === renderEpoch) $('accessible-page-text').textContent = `Página ${state.page}. ${text.items.map(item => item.str ?? '').join(' ')}`;
+    const annotations = await page.getAnnotations();
+    if (epoch === renderEpoch) {
+      for (const annotation of annotations) {
+        if (annotation.subtype !== 'FreeText' || annotation.titleObj?.str !== 'Multiversão' || !annotation.popupRef || !annotation.contentsObj?.str) continue;
+        const a = viewport.convertToViewportPoint(annotation.rect[0], annotation.rect[1]);
+        const b = viewport.convertToViewportPoint(annotation.rect[2], annotation.rect[3]);
+        const rect = [...a, ...b];
+        const id = `native-${annotation.id}`;
+        nativeNotes.set(id, { id, x: Math.min(rect[0], rect[2]) / viewport.width, y: Math.min(rect[1], rect[3]) / viewport.height, text: annotation.contentsObj.str, readOnly: true });
+      }
+      redrawAnnotations();
+    }
+    stage.dataset.renderState = 'ready';
   } catch (error) {
     if (error.name === 'RenderingCancelledException' || epoch !== renderEpoch) return;
     stage.dataset.renderState = 'error';
@@ -272,19 +355,23 @@ async function renderPage() {
   }
 }
 
-async function loadPdf(bytes, name, size) {
+async function loadPdf(bytes, name, size, restored = null) {
   const epoch = ++documentEpoch;
   clearError();
   state.loading = true;
+  stage.dataset.renderState = 'loading';
+  updateControls();
   $('document-loading').hidden = false;
   document.querySelectorAll('[data-open-file],#demo-button').forEach(b => b.disabled = true);
   let task;
   let passwordRequested = false;
+  const originalBytes = bytes.slice();
   try {
     const pdfjs = await engine();
     task = pdfjs.getDocument({
       data: bytes,
       isEvalSupported: false,
+      enableScripting: false,
       useWasm: false,
       useSystemFonts: false,
       StandardFontDataFactory: LocalStandardFontDataFactory,
@@ -297,7 +384,7 @@ async function loadPdf(bytes, name, size) {
       task.destroy().catch(() => {});
     };
     const doc = await task.promise;
-    if (epoch !== documentEpoch) { await doc.destroy(); return; }
+    if (epoch !== documentEpoch) { await destroyDocument(doc); return; }
     if (renderTask) {
       renderTask.cancel();
       try { await renderTask.promise; } catch {}
@@ -306,11 +393,16 @@ async function loadPdf(bytes, name, size) {
     ++renderEpoch;
     const old = state.document;
     state.document = doc;
+    state.originalBytes = originalBytes;
+    state.revision = Math.max(Date.now(), Number(restored?.revision) || 0);
     state.fileName = name;
     state.fileSize = size;
-    state.page = 1;
+    state.page = restored ? Math.max(1, Math.min(Number(restored.page) || 1, doc.numPages)) : 1;
     state.zoom = 1;
-    state.pages = new Map();
+    state.pages = restored
+      ? new Map(restored.pages.map(([page, value]) => [Number(page), { items: value.items, undo: [], redo: [] }]))
+      : new Map();
+    uid = Math.max(uid, ...[...state.pages.values()].flatMap(v => v.items.map(m => Number(String(m.id).split('-').pop()) || 0)));
     state.draft = null;
     state.rendering = false;
     $('file-name').textContent = name;
@@ -321,7 +413,9 @@ async function loadPdf(bytes, name, size) {
     setMode('read');
     updateControls();
     await renderPage();
-    if (old) old.destroy().catch(() => {});
+    savedLocally = !!restored;
+    persistReading(true);
+    if (old) destroyDocument(old).catch(() => {});
   } catch (error) {
     if (epoch !== documentEpoch) return;
     if (passwordRequested || error.name === 'PasswordException') {
@@ -335,18 +429,19 @@ async function loadPdf(bytes, name, size) {
       state.loading = false;
       $('document-loading').hidden = true;
       document.querySelectorAll('[data-open-file],#demo-button').forEach(b => b.disabled = false);
+      updateControls();
     }
   }
 }
 
 function replaceDocument(action) {
   if (hasAnnotations()) {
-    showConfirmation('Trocar de PDF?', 'As marcações desta sessão serão apagadas. O arquivo original continuará intacto.', 'Trocar PDF', action);
+    showConfirmation('Trocar de PDF?', 'O app guarda apenas a última leitura. Use Salvar PDF antes de trocar para manter uma cópia das marcações atuais. O original continua intacto.', 'Trocar PDF', action);
   } else action();
 }
 
 async function openFile(file) {
-  if (!file || state.loading) return;
+  if (!file || state.loading || state.exporting) return;
   if (file.size > 100 * 1024 * 1024) {
     showError('Este arquivo tem mais de 100 MB. Para evitar travamentos no aparelho, escolha um PDF menor.');
     return;
@@ -383,12 +478,61 @@ async function goToPage(value) {
   workspace.scrollTo({ top: 0, left: 0 });
   clearError();
   await renderPage();
+  persistReading();
 }
 
 async function zoomTo(value) {
   if (!state.document || state.rendering) return;
   state.zoom = clamp(Math.round(value * 10) / 10, .6, 2.4);
   await renderPage();
+}
+
+async function createExport() {
+  if (!state.document || state.exporting) return;
+  clearError();
+  state.exporting = true;
+  updateControls();
+  try {
+    const bytes = await exportAnnotatedPdf(state.document, state.pages, await engine());
+    const baseName = state.fileName.replace(/\.pdf$/i, '').replace(/[\/\\<>:"|?*\u0000-\u001f]/g, '-');
+    exportFile = new File([bytes], `${baseName}-anotado.pdf`, { type: 'application/pdf' });
+    $('export-details').textContent = `${exportFile.name} · ${formatSize(exportFile.size)} · ${state.document.numPages} páginas. O original não foi alterado.`;
+    $('export-result').textContent = '';
+    $('save-device-button').disabled = isPreview();
+    $('share-device-button').hidden = isPreview() || !(navigator.canShare?.({ files: [exportFile] }));
+    $('export-context-message').textContent = isPreview()
+      ? 'A cópia foi gerada, mas esta prévia bloqueia o salvamento de arquivos. Abra o endereço próprio do PWA para baixar ou salvar em Arquivos, sem enviar o PDF ao servidor.'
+      : 'No Android, baixe a cópia para Downloads. No iPad, use Compartilhar / Arquivos quando disponível e escolha Salvar em Arquivos. As notas ficam em comentários com marcador “Nota”, sem cobrir o texto com parágrafos.';
+    $('export-dialog').showModal();
+  } catch (error) {
+    showError(error.message?.includes('autoriza')
+      ? error.message
+      : 'Não foi possível gerar a cópia anotada. Seu original e suas marcações continuam disponíveis. Tente novamente ou peça ao responsável um PDF que permita anotações.');
+  } finally {
+    state.exporting = false;
+    updateControls();
+  }
+}
+
+async function saveExport() {
+  if (!exportFile || isPreview()) return;
+  try {
+    // Somente no contexto próprio do PWA. Nunca tentar Blob/download no iframe.
+    const url = URL.createObjectURL(exportFile);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = exportFile.name;
+    anchor.rel = 'noopener';
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    $('export-result').textContent = 'Cópia entregue ao navegador. Confira Downloads ou use Compartilhar para salvar em Arquivos.';
+  } catch (error) {
+    $('export-result').textContent = error.name === 'AbortError'
+      ? 'Salvamento cancelado. A cópia continua pronta.'
+      : 'O navegador não concluiu o salvamento. Tente Compartilhar / Arquivos.';
+  }
 }
 
 function pointFromEvent(event) {
@@ -426,11 +570,12 @@ function openNoteEditor(point, existing = null) {
 }
 
 function showNote(id) {
-  const mark = pageAnnotations(state).items.find(m => m.id === id && m.type === 'note');
+  const mark = pageAnnotations(state).items.find(m => m.id === id && m.type === 'note') || nativeNotes.get(id);
   if (!mark) return;
   activeNoteId = id;
   const bubble = $('note-bubble');
   $('note-bubble-text').textContent = mark.text;
+  $('edit-note-button').hidden = !!mark.readOnly;
   bubble.hidden = false;
   const width = stage.clientWidth;
   const height = stage.clientHeight;
@@ -502,6 +647,61 @@ $('file-input').addEventListener('change', event => {
 });
 $('demo-button').addEventListener('click', openDemo);
 $('help-button').addEventListener('click', () => $('help-dialog').showModal());
+$('pwa-button').addEventListener('click', () => $('pwa-dialog').showModal());
+$('install-button').addEventListener('click', async () => {
+  try { await installPwa(); }
+  catch { $('pwa-explanation').textContent = 'Use o menu do navegador para adicionar o app à tela inicial.'; }
+});
+$('resume-button').addEventListener('click', async () => {
+  const stored = await getStoredReading(true);
+  if (!stored?.bytes) { showError('A leitura local não está mais disponível. Escolha o PDF no aparelho.'); await refreshResumeButton(); return; }
+  await loadPdf(stored.bytes, stored.name, stored.size, stored);
+});
+$('clear-local-button').addEventListener('click', () => {
+  $('pwa-dialog').close();
+  showConfirmation('Apagar leitura deste aparelho?', 'A cópia local do PDF e suas marcações serão removidas do armazenamento do app. PDFs já baixados em Arquivos/Downloads não serão apagados.', 'Apagar leitura local', async () => {
+    ++persistRequested;
+    await persistQueue;
+    await clearStoredReading();
+    savedLocally = false;
+    ++documentEpoch;
+    ++renderEpoch;
+    renderTask?.cancel();
+    const old = state.document;
+    state.document = null;
+    state.loading = false;
+    state.rendering = false;
+    state.exporting = false;
+    state.originalBytes = null;
+    state.pages.clear();
+    state.page = 1;
+    nativeNotes.clear();
+    layer.replaceChildren();
+    canvas.width = 0;
+    canvas.height = 0;
+    $('document-loading').hidden = true;
+    $('render-loading').hidden = true;
+    $('file-name').textContent = 'Seu espaço de leitura';
+    $('file-details').textContent = 'Sem cadastro. Sem alterar o original.';
+    $('reader').hidden = true;
+    $('empty-state').hidden = false;
+    updateControls();
+    destroyDocument(old).catch(() => {});
+    await refreshResumeButton();
+    $('temporary-notice').textContent = 'Leitura local apagada. Seus PDFs em Arquivos/Downloads não foram alterados.';
+  });
+});
+$('export-button').addEventListener('click', createExport);
+$('save-device-button').addEventListener('click', saveExport);
+$('share-device-button').addEventListener('click', async () => {
+  if (!exportFile || isPreview()) return;
+  try {
+    await navigator.share({ files: [exportFile], title: 'PDF anotado · Multiversão' });
+    $('export-result').textContent = 'Arquivo entregue ao destino escolhido.';
+  } catch (error) {
+    $('export-result').textContent = error.name === 'AbortError' ? 'Compartilhamento cancelado.' : 'Não foi possível compartilhar. Tente Baixar PDF.';
+  }
+});
 $('dismiss-error').addEventListener('click', clearError);
 document.querySelectorAll('[data-mode]').forEach(button => {
   button.addEventListener('click', () => setMode(button.dataset.mode));
@@ -571,19 +771,22 @@ new ResizeObserver(() => {
   resizeTimer = setTimeout(() => { if (state.document && !state.loading) renderPage(); }, 150);
 }).observe(workspace);
 
-window.addEventListener('pagehide', event => {
-  // Evita reter PDF/anotações no cache de navegação de alguns navegadores.
-  if (event.persisted) {
-    state.pages.clear();
-    state.draft = null;
-    state.document?.destroy().catch(() => {});
-    state.document = null;
-    canvas.width = 0;
-    canvas.height = 0;
-    layer.replaceChildren();
+initializePwa(async status => {
+  $('pwa-label').textContent = status.message;
+  $('preview-notice').hidden = !status.preview;
+  $('install-button').hidden = !status.canInstall;
+  if (status.preview) {
+    $('pwa-explanation').textContent = 'Você está na prévia de demonstração. Para instalar e usar offline, este PWA precisa ser disponibilizado em um endereço próprio HTTPS. Nenhum PDF de aluno será publicado junto com o app.';
+    $('temporary-notice').textContent = 'Prévia: marcações em memória. Salvamento no PWA próprio.';
+  }
+  await refreshResumeButton();
+});
+window.addEventListener('beforeunload', event => {
+  if (!isPreview() && pwaStatus().localAccess && state.document && hasAnnotations() && !savedLocally) {
+    event.preventDefault();
+    event.returnValue = '';
   }
 });
-window.addEventListener('pageshow', event => { if (event.persisted) window.location.reload(); });
 window.addEventListener('DOMContentLoaded', initIcons);
 if (document.readyState !== 'loading') initIcons();
 layer.dataset.mode = 'read';

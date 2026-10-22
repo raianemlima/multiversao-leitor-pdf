@@ -14,7 +14,7 @@ pdfmetrics.registerFont(TTFont("DemoBold", "/usr/share/fonts/truetype/dejavu/Dej
 buffer = BytesIO()
 c = canvas.Canvas(buffer, pagesize=(595.28, 841.89))
 c.setTitle("Guia de leitura — documento de demonstração")
-c.setAuthor("Perplexity Computer")
+c.setAuthor("Multiversão")
 
 def text(x, y, value, font="DemoSans", size=10.5, color="#394b59"):
     c.setFillColor(HexColor(color))
@@ -24,7 +24,7 @@ def text(x, y, value, font="DemoSans", size=10.5, color="#394b59"):
 def base(page):
     c.setFillColor(HexColor("#ffffff"))
     c.rect(0, 0, 595.28, 841.89, fill=1, stroke=0)
-    text(60, 790, "LEITOR DE ESTUDO", "DemoBold", 9, "#233b52")
+    text(60, 790, "MULTIVERSÃO | LEITOR PDF", "DemoBold", 9, "#233b52")
     text(445, 790, "EXEMPLO", "DemoSans", 8, "#68746e")
     c.setStrokeColor(HexColor("#dbe1dc"))
     c.line(60, 775, 535, 775)
@@ -47,7 +47,7 @@ para(575, [
     "experimentar grifos, escrita à mão e notas de estudo.",
     "",
     "O PDF permanece intacto. Tudo o que você acrescenta fica",
-    "em uma camada temporária, separada do arquivo original.",
+    "em uma camada separada. Salve uma cópia PDF para guardar.",
 ])
 text(60, 414, "Um trecho para destacar", "DemoBold", 13, "#233b52")
 para(380, [
@@ -79,8 +79,8 @@ para(438, [
 ])
 text(60, 260, "Tudo continua separado do original.", "DemoSerif", 17, "#233b52")
 para(215, [
-    "Navegar entre as páginas mantém as marcações nesta sessão.",
-    "Fechar ou recarregar o leitor apaga todas as marcações.",
+    "O PWA pode guardar a última leitura no próprio aparelho.",
+    "Use Salvar PDF para manter uma cópia de segurança.",
 ])
 c.showPage()
 base(3)
