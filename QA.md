@@ -186,3 +186,18 @@ persistência local e exportação substitui a perda de marcações no recarrega
   altura, navegação, zoom de 180% e download da cópia anotada (qpdf sem erro).
   Site público republicado (service worker 79a49835c118), sem erros.
 - Limite: WebKit real indisponível neste ambiente; confirmar no iPhone.
+
+## Notas visíveis e toque com o dedo (22/10/2026)
+
+- Notas: a cópia exportada mostra o texto completo da nota em um cartão claro
+  (carimbo de fundo + texto livre), legível no visualizador do iPhone/iPad, que
+  não abre comentários pop-up. O comentário continua anexado e o app reabre a
+  nota pelo marcador.
+- Toque: seleção de texto, lupa e menu de pressão longa bloqueados no leitor
+  (inputs e textarea continuam editáveis); toque liberado assim que a página é
+  desenhada; redesenho por quadro; caneta com filtro de pontos próximos.
+- Grifo: passada do dedo se ajusta às linhas do texto, do ponto inicial ao
+  final, respeitando colunas; páginas sem texto (digitalizadas) usam faixa com
+  altura mínima de uma linha. Um grifo de várias linhas desfaz em um passo.
+- Testes: toques CDP em perfil iPhone no ECA (duas colunas), caneta, nota,
+  exportação (qpdf sem erro, render poppler) e reabertura da cópia com nota.

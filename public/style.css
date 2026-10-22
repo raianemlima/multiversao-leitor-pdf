@@ -11,6 +11,9 @@
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;-webkit-font-smoothing:antialiased;scroll-padding-top:var(--space-16)}
 body{height:100dvh;min-height:400px;display:flex;flex-direction:column;font-family:var(--font-body);font-size:var(--text-base);line-height:1.5;color:var(--color-text);background:var(--color-bg)}
 img,canvas,svg{display:block}
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+.page-stage,.page-stage *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;background:none;border:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 button,a,input,select,textarea{transition:background .12s ease,border-color .12s ease,color .12s ease}

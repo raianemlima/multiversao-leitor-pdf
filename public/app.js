@@ -27,10 +27,11 @@ let persistRequested = 0;
 let exportFile = null;
 let savedLocally = false;
 let nativeNotes = new Map();
+let textLines = [];
 
 const hints = {
   read: 'Role para ler. Toque nos marcadores para reler as notas.',
-  highlight: 'Arraste um retângulo sobre o trecho que deseja grifar.',
+  highlight: 'Passe o dedo sobre o texto para grifar. O grifo se ajusta às linhas.',
   pen: 'Escreva na página com o dedo, mouse ou caneta.',
   note: 'Toque no ponto da página onde deseja adicionar uma nota.',
   eraser: 'Toque em um grifo, traço ou marcador para apagar.'
@@ -283,7 +284,8 @@ function redrawAnnotations() {
     target.append(svgElement('rect', { x: -8 * scale, y: -8 * scale, width: 60 * scale, height: 44 * scale, fill: 'transparent' }));
     layer.append(target);
   }
-  if (state.draft) renderMark(state.draft, true);
+  if (state.draft?.parts) for (const part of state.draft.parts) renderMark({ ...state.draft, ...part }, true);
+  else if (state.draft) renderMark(state.draft, true);
 }
 
 async function renderPage() {
@@ -291,6 +293,7 @@ async function renderPage() {
   const epoch = ++renderEpoch;
   const doc = state.document;
   nativeNotes = new Map();
+  textLines = [];
   state.rendering = true;
   if (renderTask) {
     renderTask.cancel();
@@ -350,10 +353,17 @@ async function renderPage() {
     if (epoch !== renderEpoch || state.document !== doc) return;
     stage.dataset.renderState = 'ready';
     if ($('error-banner').dataset.kind === 'render') clearError();
+    // A página já está visível: libera o toque sem esperar texto e notas.
+    state.rendering = false;
+    $('render-loading').hidden = true;
+    updateControls();
     // Texto acessível e notas nativas são complementares: falhas aqui não bloqueiam a leitura.
     try {
       const text = await page.getTextContent();
-      if (epoch === renderEpoch) $('accessible-page-text').textContent = `Página ${state.page}. ${text.items.map(item => item.str ?? '').join(' ')}`;
+      if (epoch === renderEpoch) {
+        $('accessible-page-text').textContent = `Página ${state.page}. ${text.items.map(item => item.str ?? '').join(' ')}`;
+        textLines = buildTextLines(text.items, viewport);
+      }
     } catch (error) {
       console.warn('Texto acessível indisponível nesta página:', error?.name, error?.message);
     }
@@ -567,6 +577,85 @@ async function saveExport() {
   }
 }
 
+// Agrupa os trechos de texto da página em linhas (coordenadas 0–1 da página).
+function buildTextLines(items, viewport) {
+  const boxes = [];
+  for (const item of items) {
+    if (!item.str?.trim() || !item.transform || !item.width) continue;
+    const [a, b, c, d, e, f] = item.transform;
+    if (Math.abs(b) > .01 * Math.abs(a) || Math.abs(c) > .01 * Math.abs(d)) continue; // texto girado
+    const size = Math.hypot(c, d) || item.height || 10;
+    const p1 = viewport.convertToViewportPoint(e, f - size * .22);
+    const p2 = viewport.convertToViewportPoint(e + item.width, f + size * .88);
+    const x0 = Math.min(p1[0], p2[0]) / viewport.width, x1 = Math.max(p1[0], p2[0]) / viewport.width;
+    const y0 = Math.min(p1[1], p2[1]) / viewport.height, y1 = Math.max(p1[1], p2[1]) / viewport.height;
+    if (x1 - x0 <= 0 || y1 - y0 <= 0 || y1 - y0 > .2) continue;
+    boxes.push({ x0, x1, y0, y1 });
+  }
+  const ratio = viewport.height / viewport.width;
+  boxes.sort((m, n) => (m.y0 + m.y1) - (n.y0 + n.y1) || m.x0 - n.x0);
+  const lines = [];
+  for (const box of boxes) {
+    const center = (box.y0 + box.y1) / 2;
+    // Mesma altura e perto na horizontal; um vão grande indica outra coluna.
+    const maxGap = (box.y1 - box.y0) * ratio * 1.3;
+    const line = lines.find(l => center > l.y0 && center < l.y1
+      && Math.abs((l.y1 - l.y0) - (box.y1 - box.y0)) < (l.y1 - l.y0) * .8
+      && box.x0 - l.x1 < maxGap && l.x0 - box.x1 < maxGap);
+    if (line) {
+      line.x0 = Math.min(line.x0, box.x0); line.x1 = Math.max(line.x1, box.x1);
+      line.y0 = Math.min(line.y0, box.y0); line.y1 = Math.max(line.y1, box.y1);
+      line.boxes.push(box);
+    } else lines.push({ ...box, boxes: [box] });
+  }
+  return lines.sort((m, n) => m.y0 - n.y0);
+}
+
+function lineNear(point) {
+  let best = null, bestDistance = Infinity;
+  for (const line of textLines) {
+    const dy = point.y < line.y0 ? line.y0 - point.y : point.y > line.y1 ? point.y - line.y1 : 0;
+    const dx = point.x < line.x0 ? line.x0 - point.x : point.x > line.x1 ? point.x - line.x1 : 0;
+    const distance = dy * 3 + dx;
+    if (distance < bestDistance) { bestDistance = distance; best = line; }
+  }
+  return bestDistance < .045 ? best : null;
+}
+
+// Grifo como marca-texto: do ponto inicial ao final, seguindo as linhas do texto.
+function snapHighlight(start, end) {
+  let first = lineNear(start), last = lineNear(end);
+  if (!first || !last) return null;
+  let a = start, b = end;
+  if (last.y0 < first.y0 || (last === first && end.x < start.x)) { [first, last] = [last, first]; [a, b] = [b, a]; }
+  const pad = .004;
+  const parts = [];
+  const colX0 = Math.min(first.x0, last.x0), colX1 = Math.max(first.x1, last.x1);
+  for (const line of textLines) {
+    if (line.y0 < first.y0 - 1e-6 || line.y0 > last.y0 + 1e-6) continue;
+    if (line !== first && line !== last && (line.x1 <= colX0 || line.x0 >= colX1)) continue; // outra coluna
+    let x0 = line.x0, x1 = line.x1;
+    if (line === first) x0 = Math.max(x0, Math.min(a.x, line.x1));
+    if (line === last) x1 = Math.min(x1, Math.max(b.x, line.x0));
+    if (x1 - x0 < .004) continue;
+    parts.push({ x: clamp(x0 - pad, 0, 1), y: line.y0, w: Math.min(1, x1 + pad) - clamp(x0 - pad, 0, 1), h: line.y1 - line.y0 });
+  }
+  return parts.length ? parts : null;
+}
+
+function updateHighlightDraft(point) {
+  const start = gesture.start;
+  const parts = snapHighlight(start, point);
+  if (parts) Object.assign(state.draft, { parts, x: parts[0].x, y: parts[0].y, w: parts[0].w, h: parts[0].h });
+  else {
+    // Sem texto detectável (página digitalizada): faixa com altura mínima de uma linha.
+    const minH = .018;
+    const y = Math.min(start.y, point.y), h = Math.abs(start.y - point.y);
+    Object.assign(state.draft, { parts: null, x: Math.min(start.x, point.x), w: Math.abs(start.x - point.x),
+      y: h < minH ? clamp((start.y + point.y) / 2 - minH / 2, 0, 1 - minH) : y, h: Math.max(h, minH) });
+  }
+}
+
 function pointFromEvent(event) {
   const rect = layer.getBoundingClientRect();
   return { x: clamp((event.clientX - rect.left) / rect.width, 0, 1), y: clamp((event.clientY - rect.top) / rect.height, 0, 1) };
@@ -627,21 +716,32 @@ layer.addEventListener('pointerdown', event => {
   layer.setPointerCapture(event.pointerId);
   gesture = { type: state.mode, start: point, pointerId: event.pointerId };
   state.draft = state.mode === 'highlight'
-    ? { id: nextId(), type: 'highlight', ...point, w: 0, h: 0, color: state.color }
+    ? { id: nextId(), type: 'highlight', ...point, w: 0, h: 0, color: state.color, parts: null }
     : { id: nextId(), type: 'pen', points: [point], color: state.color, width: state.penWidth * 1.7 };
 });
+
+let redrawFrame = 0;
+function scheduleRedraw() {
+  if (redrawFrame) return;
+  redrawFrame = requestAnimationFrame(() => { redrawFrame = 0; redrawAnnotations(); });
+}
 
 layer.addEventListener('pointermove', event => {
   if (!gesture || gesture.pointerId !== event.pointerId || !state.draft) return;
   event.preventDefault();
   const point = pointFromEvent(event);
   if (gesture.type === 'highlight') {
-    Object.assign(state.draft, { x: Math.min(gesture.start.x, point.x), y: Math.min(gesture.start.y, point.y), w: Math.abs(gesture.start.x - point.x), h: Math.abs(gesture.start.y - point.y) });
+    updateHighlightDraft(point);
   } else {
     const samples = event.getCoalescedEvents?.() ?? [event];
-    for (const sample of samples.length ? samples : [event]) state.draft.points.push(pointFromEvent(sample));
+    const points = state.draft.points;
+    for (const sample of samples.length ? samples : [event]) {
+      const next = pointFromEvent(sample);
+      const prev = points[points.length - 1];
+      if (!prev || Math.hypot(next.x - prev.x, next.y - prev.y) > .0012) points.push(next);
+    }
   }
-  redrawAnnotations();
+  scheduleRedraw();
 });
 
 layer.addEventListener('pointerup', event => {
@@ -651,11 +751,27 @@ layer.addEventListener('pointerup', event => {
   gesture = null;
   if (layer.hasPointerCapture(event.pointerId)) layer.releasePointerCapture(event.pointerId);
   if (type === 'note') { openNoteEditor(point); return; }
+  if (redrawFrame) { cancelAnimationFrame(redrawFrame); redrawFrame = 0; }
   const draft = state.draft;
   state.draft = null;
-  if (draft && ((draft.type === 'highlight' && draft.w > .003 && draft.h > .002) || (draft.type === 'pen' && draft.points.length > 1))) {
+  if (draft?.type === 'highlight' && draft.parts?.length) {
+    const { parts, ...base } = draft;
+    mutateAnnotations(list => [...list, ...parts.map((part, i) => ({ ...base, ...part, id: i ? nextId() : base.id }))]);
+  } else if (draft && ((draft.type === 'highlight' && draft.w > .006 && draft.h > .002) || (draft.type === 'pen' && draft.points.length > 1))) {
+    delete draft.parts;
     mutateAnnotations(list => [...list, draft]);
   } else redrawAnnotations();
+});
+
+// iPhone/iPad: impede seleção de texto, lupa e menu de pressão longa ao desenhar.
+for (const type of ['touchstart', 'touchmove']) {
+  layer.addEventListener(type, event => {
+    if (state.mode !== 'read' && event.touches.length === 1) event.preventDefault();
+  }, { passive: false });
+}
+layer.addEventListener('contextmenu', event => { if (state.mode !== 'read') event.preventDefault(); });
+document.addEventListener('selectstart', event => {
+  if (!event.target.closest?.('input, textarea, #accessible-page-text')) event.preventDefault();
 });
 
 layer.addEventListener('pointercancel', () => { gesture = null; state.draft = null; redrawAnnotations(); });
